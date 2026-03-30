@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Calendar, TrendingUp, TrendingDown } from "lucide-react";
 import type { FutureNodeData } from "@/lib/ai/types";
 import ExtendButton from "./ExtendButton";
+import { useTreeContext } from "./tree-context";
 
 /* ─── Probability ring ──────────────────────────────────────────────────────── */
 
@@ -70,6 +71,7 @@ const FutureNode = memo(function FutureNode({
 }: NodeProps<FutureNodeData>) {
   const isRoot = data.isRoot ?? false;
   const probability = data.probability ?? 0;
+  const { onExtend } = useTreeContext();
 
   const borderColor =
     selected
@@ -179,7 +181,7 @@ const FutureNode = memo(function FutureNode({
         )}
 
         {/* Extend button */}
-        {!isRoot && <ExtendButton nodeId={id} />}
+        {!isRoot && <ExtendButton nodeId={id} onExtend={onExtend} />}
       </div>
     </motion.div>
   );

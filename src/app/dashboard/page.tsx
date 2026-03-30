@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -11,10 +12,14 @@ import {
   X,
   Loader2,
   Info,
+  Key,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/layout/Navbar";
 import { DEMO_SIMULATION } from "@/lib/ai/types";
+import { authClient } from "@/lib/auth-client";
+import { useOracle } from "@/hooks/useOracle";
+import type { SimulationTree, FutureTreeNode, FutureTreeEdge } from "@/lib/ai/types";
 
 const FutureTree = dynamic(() => import("@/components/tree/FutureTree"), {
   ssr: false,
@@ -36,6 +41,46 @@ interface SimulationMeta {
   status: "complete" | "generating" | "draft";
 }
 
+/* ── DB node shape returned by /api/simulations/[id] ── */
+interface DbNode {
+  id: string;
+  parentId: string | null;
+  title: string;
+  description: string;
+  probability: number;
+  timeframe: string | null;
+  depth: number;
+  details: unknown;
+  positionX: number | null;
+  positionY: number | null;
+}
+
+function dbNodesToTree(nodes: DbNode[]): SimulationTree {
+  const rfNodes: FutureTreeNode[] = nodes.map((n) => ({
+    id: n.id,
+    type: "futureNode" as const,
+    position: { x: n.positionX ?? 0, y: n.positionY ?? 0 },
+    data: {
+      title: n.title,
+      description: n.description,
+      probability: n.probability,
+      timeframe: n.timeframe ?? "",
+      depth: n.depth,
+      isRoot: n.parentId === null,
+      details: n.details as FutureTreeNode["data"]["details"],
+    },
+  }));
+  const rfEdges: FutureTreeEdge[] = nodes
+    .filter((n) => n.parentId !== null)
+    .map((n) => ({
+      id: `e-${n.parentId}-${n.id}`,
+      source: n.parentId!,
+      target: n.id,
+      type: "branchEdge",
+    }));
+  return { nodes: rfNodes, edges: rfEdges };
+}
+
 const DEMO_SIMULATIONS: SimulationMeta[] = [
   {
     id: "demo-1",
@@ -44,40 +89,33 @@ const DEMO_SIMULATIONS: SimulationMeta[] = [
     createdAt: "2026-03-28",
     status: "complete",
   },
-  {
-    id: "demo-2",
-    title: "Relocate to Tokyo",
-    nodeCount: 7,
-    createdAt: "2026-03-25",
-    status: "complete",
-  },
-  {
-    id: "demo-3",
-    title: "Start a SaaS company",
-    nodeCount: 4,
-    createdAt: "2026-03-30",
-    status: "generating",
-  },
 ];
 
+/* ── New Simulation Modal ── */
 function NewSimulationModal({
   onClose,
-  onCreate,
+  onSimulate,
 }: {
   onClose: () => void;
-  onCreate: (title: string) => void;
+  onSimulate: (title: string, apiKey: string, provider: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [provider, setProvider] = useState("claude");
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handle = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || !apiKey.trim()) return;
     setGenerating(true);
-    // Simulate API call delay
-    await new Promise((r) => setTimeout(r, 1500));
-    onCreate(title.trim());
-    setGenerating(false);
-    onClose();
+    setError(null);
+    try {
+      await onSimulate(title.trim(), apiKey.trim(), provider);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Simulation failed");
+      setGenerating(false);
+    }
   };
 
   const suggestions = [
@@ -130,7 +168,7 @@ function NewSimulationModal({
           />
         </div>
 
-        <div className="mb-6">
+        <div className="mb-4">
           <p className="text-xs text-text-muted mb-2.5">Quick suggestions</p>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((s) => (
@@ -145,9 +183,46 @@ function NewSimulationModal({
           </div>
         </div>
 
+        {/* API Key section */}
+        <div className="mb-4 glass rounded-xl p-4 space-y-3 border border-border-subtle">
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <Key className="w-3.5 h-3.5" />
+            <span>AI provider &amp; key</span>
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              className="bg-void-800/60 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-oracle-700 transition-colors"
+            >
+              <option value="claude">Claude</option>
+              <option value="openai">OpenAI</option>
+              <option value="custom">Custom</option>
+            </select>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-ant-api03-…"
+              className="flex-1 bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 font-mono"
+            />
+          </div>
+          <p className="text-xs text-text-ghost">
+            Save your key in{" "}
+            <a href="/profile" className="text-oracle-500 hover:underline">
+              Profile → AI Keys
+            </a>{" "}
+            to reuse it across sessions.
+          </p>
+        </div>
+
+        {error && (
+          <p className="text-xs text-hazard-400 mb-3">{error}</p>
+        )}
+
         <button
           onClick={handle}
-          disabled={!title.trim() || generating}
+          disabled={!title.trim() || !apiKey.trim() || generating}
           className="w-full flex items-center justify-center gap-2 bg-oracle-500 hover:bg-oracle-400 disabled:opacity-50 disabled:cursor-not-allowed text-void-950 font-semibold py-3 rounded-xl transition-all duration-200 hover:shadow-[0_0_24px_oklch(72%_0.175_76_/_0.5)] text-sm"
         >
           {generating ? (
@@ -167,28 +242,137 @@ function NewSimulationModal({
   );
 }
 
+/* ── Dashboard ── */
 export default function DashboardPage() {
+  const router = useRouter();
+  const { data: session, isPending: sessionLoading } = authClient.useSession();
+  const oracle = useOracle();
+
   const [activeSimId, setActiveSimId] = useState<string>("demo-1");
   const [simulations, setSimulations] = useState<SimulationMeta[]>(DEMO_SIMULATIONS);
+  const [treesById, setTreesById] = useState<Record<string, SimulationTree>>({
+    "demo-1": DEMO_SIMULATION,
+  });
   const [showNewModal, setShowNewModal] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [lastApiKey, setLastApiKey] = useState("");
+  const [lastProvider, setLastProvider] = useState<"claude" | "openai" | "custom">("claude");
+
+  // Client-side auth guard
+  useEffect(() => {
+    if (!sessionLoading && !session) router.push("/login");
+  }, [session, sessionLoading, router]);
+
+  // Fetch real simulations on mount
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/simulations")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: SimulationMeta[]) => {
+        if (data.length > 0) {
+          setSimulations(data);
+          setActiveSimId(data[0].id);
+        }
+        // else keep DEMO_SIMULATIONS
+      })
+      .catch(() => {}); // keep demo on error
+  }, [session]);
+
+  // Load tree for the active simulation when it changes
+  useEffect(() => {
+    if (!activeSimId || treesById[activeSimId]) return;
+    // If oracle just created this sim, it's already in treesById via handleSimulate
+    fetch(`/api/simulations/${activeSimId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { nodes: DbNode[] } | null) => {
+        if (!data) return;
+        setTreesById((prev) => ({
+          ...prev,
+          [activeSimId]: dbNodesToTree(data.nodes),
+        }));
+      })
+      .catch(() => {});
+  }, [activeSimId, treesById]);
+
+  // Keep the active sim's tree in sync when oracle extends nodes
+  useEffect(() => {
+    if (!oracle.simulationId || oracle.nodes.length === 0) return;
+    setTreesById((prev) => ({
+      ...prev,
+      [oracle.simulationId!]: { nodes: oracle.nodes, edges: oracle.edges },
+    }));
+  }, [oracle.simulationId, oracle.nodes, oracle.edges]);
+
+  const handleSimulate = useCallback(
+    async (title: string, apiKey: string, provider: string) => {
+      setLastApiKey(apiKey);
+      setLastProvider(provider as "claude" | "openai" | "custom");
+
+      // Build a minimal profile from session
+      const profile = {
+        name: session?.user?.name ?? "",
+        skills: [],
+        experience: [],
+        education: [],
+      };
+
+      const result = await oracle.simulate({
+        decision: title,
+        profile,
+        apiKey,
+        provider: provider as "claude" | "openai" | "custom",
+      });
+
+      const newSim: SimulationMeta = {
+        id: result.simulationId,
+        title,
+        nodeCount: result.tree.nodes.length,
+        createdAt: new Date().toISOString().split("T")[0],
+        status: "complete",
+      };
+
+      setSimulations((prev) => {
+        const filtered = prev.filter((s) => !s.id.startsWith("demo-"));
+        return [newSim, ...filtered];
+      });
+      setTreesById((prev) => ({ ...prev, [result.simulationId]: result.tree }));
+      setActiveSimId(result.simulationId);
+    },
+    [session, oracle]
+  );
+
+  const handleExtend = useCallback(
+    async (nodeId: string) => {
+      if (!lastApiKey) return;
+      const profile = {
+        name: session?.user?.name ?? "",
+        skills: [],
+        experience: [],
+        education: [],
+      };
+      await oracle.extendNode({
+        nodeId,
+        profile,
+        apiKey: lastApiKey,
+        provider: lastProvider,
+      });
+    },
+    [session, oracle, lastApiKey, lastProvider]
+  );
+
+  if (sessionLoading) {
+    return (
+      <div className="h-screen bg-void-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-oracle-500 animate-spin" />
+      </div>
+    );
+  }
+  if (!session) return null;
 
   const activeSim = simulations.find((s) => s.id === activeSimId);
-
-  const handleCreate = (title: string) => {
-    const newSim: SimulationMeta = {
-      id: `sim-${Date.now()}`,
-      title,
-      nodeCount: 0,
-      createdAt: new Date().toISOString().split("T")[0],
-      status: "generating",
-    };
-    setSimulations((prev) => [newSim, ...prev]);
-    setActiveSimId(newSim.id);
-  };
-
+  const activeTree = treesById[activeSimId];
   const selectedNode = selectedNodeId
-    ? DEMO_SIMULATION.nodes.find((n) => n.id === selectedNodeId)
+    ? activeTree?.nodes.find((n) => n.id === selectedNodeId)
     : null;
 
   return (
@@ -215,7 +399,10 @@ export default function DashboardPage() {
             {simulations.map((sim) => (
               <button
                 key={sim.id}
-                onClick={() => setActiveSimId(sim.id)}
+                onClick={() => {
+                  setActiveSimId(sim.id);
+                  setSelectedNodeId(null);
+                }}
                 className={`w-full text-left px-3 py-3 rounded-xl transition-all duration-150 group ${
                   activeSimId === sim.id
                     ? "bg-oracle-900/40 border border-oracle-800/50 text-text-primary"
@@ -253,7 +440,6 @@ export default function DashboardPage() {
 
         {/* ── Main Tree Area ── */}
         <main className="flex-1 flex flex-col overflow-hidden relative">
-          {/* Tree header */}
           {activeSim && (
             <div className="px-6 py-3.5 border-b border-border-subtle flex items-center gap-3 bg-void-900/30">
               <GitBranch className="w-4 h-4 text-oracle-500 shrink-0" />
@@ -262,31 +448,30 @@ export default function DashboardPage() {
                 <span className="text-xs text-text-ghost">{activeSim.nodeCount} nodes</span>
                 <ChevronRight className="w-3.5 h-3.5 text-text-ghost" />
                 <span className="text-xs text-text-muted">
-                  {new Date(activeSim.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {new Date(activeSim.createdAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </span>
               </div>
             </div>
           )}
 
-          {/* Tree canvas */}
           <div className="flex-1 overflow-hidden">
-            {activeSimId === "demo-1" ? (
+            {activeTree ? (
               <FutureTree
-                nodes={DEMO_SIMULATION.nodes}
-                edges={DEMO_SIMULATION.edges}
+                nodes={activeTree.nodes}
+                edges={activeTree.edges}
                 onNodeSelect={setSelectedNodeId}
                 selectedNodeId={selectedNodeId}
+                onExtend={handleExtend}
               />
             ) : (
               <div className="flex-1 h-full flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-oracle-900/40 border border-oracle-800/30 flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="w-6 h-6 text-oracle-500" strokeWidth={1.5} />
-                  </div>
-                  <p className="text-text-primary font-medium mb-1">Simulation ready</p>
-                  <p className="text-text-muted text-sm max-w-xs">
-                    AI is generating your future branches. This takes about 15–30 seconds.
-                  </p>
+                  <Loader2 className="w-8 h-8 text-oracle-500 animate-spin mx-auto mb-4" />
+                  <p className="text-text-muted text-sm">Loading simulation…</p>
                 </div>
               </div>
             )}
@@ -340,13 +525,14 @@ export default function DashboardPage() {
                   {selectedNode.data.description}
                 </p>
 
-                {/* Timeframe */}
                 <div className="flex items-center gap-2 text-sm text-text-muted mb-4">
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>Timeframe: <span className="text-text-secondary">{selectedNode.data.timeframe}</span></span>
+                  <span>
+                    Timeframe:{" "}
+                    <span className="text-text-secondary">{selectedNode.data.timeframe}</span>
+                  </span>
                 </div>
 
-                {/* Details */}
                 {selectedNode.data.details && (
                   <div className="space-y-3">
                     {selectedNode.data.details.pros && (
@@ -387,7 +573,7 @@ export default function DashboardPage() {
         {showNewModal && (
           <NewSimulationModal
             onClose={() => setShowNewModal(false)}
-            onCreate={handleCreate}
+            onSimulate={handleSimulate}
           />
         )}
       </AnimatePresence>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -41,11 +41,13 @@ type FormData = z.infer<typeof schema>;
 export default function DataInputForm() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     control,
+    reset,
     formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -58,12 +60,80 @@ export default function DataInputForm() {
   const { fields: expFields, append: appendExp, remove: removeExp } = useFieldArray({ control, name: "experience" });
   const { fields: eduFields, append: appendEdu, remove: removeEdu } = useFieldArray({ control, name: "education" });
 
-  const onSubmit = async (_data: FormData) => {
+  // Load profile from API on mount
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => {
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        if (!data) return;
+        reset({
+          bio: data.bio ?? "",
+          location: data.location ?? "",
+          website: data.website ?? "",
+          linkedinUrl: data.linkedinUrl ?? "",
+          githubUsername: data.githubUsername ?? "",
+          experience:
+            data.experience?.length > 0
+              ? data.experience.map((e: Record<string, string>) => ({
+                  company: e.company ?? "",
+                  title: e.title ?? "",
+                  startDate: e.startDate ?? "",
+                  endDate: e.endDate ?? "",
+                  description: e.description ?? "",
+                }))
+              : [{ company: "", title: "" }],
+          education:
+            data.education?.length > 0
+              ? data.education.map((e: Record<string, string | number>) => ({
+                  institution: e.institution ?? "",
+                  degree: e.degree ?? "",
+                  field: e.field ?? "",
+                  startYear: e.startYear?.toString() ?? "",
+                  endYear: e.endYear?.toString() ?? "",
+                }))
+              : [{ institution: "" }],
+          skills: Array.isArray(data.skills) ? data.skills.join(", ") : (data.skills ?? ""),
+          riskTolerance: data.riskTolerance ?? "medium",
+          timeHorizon: data.timeHorizon ?? "3y",
+        });
+      })
+      .catch((err) => {
+        setLoadError(err.message);
+      });
+  }, [reset]);
+
+  const onSubmit = async (data: FormData) => {
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 900));
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    try {
+      const skillsArray = data.skills
+        ? data.skills.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      const education = data.education.map((e) => ({
+        ...e,
+        startYear: e.startYear ? parseInt(e.startYear) : undefined,
+        endYear: e.endYear ? parseInt(e.endYear) : undefined,
+      }));
+
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, skills: skillsArray, education }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      setSaved(true);
+      reset(data); // clear isDirty
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error("Save failed:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputClass =
@@ -72,6 +142,12 @@ export default function DataInputForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-7 max-w-2xl">
+      {loadError && (
+        <div className="text-xs text-hazard-400 px-1">
+          Could not load profile: {loadError}
+        </div>
+      )}
+
       {/* Bio & location */}
       <div className="glass-card rounded-xl p-5 space-y-4">
         <h2 className="text-sm font-semibold text-text-primary">Basic info</h2>

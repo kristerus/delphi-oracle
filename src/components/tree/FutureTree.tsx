@@ -16,6 +16,7 @@ import "@xyflow/react/dist/style.css";
 import FutureNode from "./FutureNode";
 import BranchEdge from "./BranchEdge";
 import type { FutureTreeNode, FutureTreeEdge } from "@/lib/ai/types";
+import { TreeContext } from "./tree-context";
 
 const nodeTypes = {
   futureNode: FutureNode,
@@ -30,6 +31,7 @@ interface FutureTreeProps {
   edges: FutureTreeEdge[];
   onNodeSelect?: (nodeId: string | null) => void;
   selectedNodeId?: string | null;
+  onExtend?: (nodeId: string) => Promise<void>;
 }
 
 function FutureTreeInner({
@@ -37,6 +39,7 @@ function FutureTreeInner({
   edges,
   onNodeSelect,
   selectedNodeId,
+  onExtend,
 }: FutureTreeProps) {
   const { fitView } = useReactFlow();
 
@@ -62,6 +65,7 @@ function FutureTreeInner({
   }, [onNodeSelect]);
 
   return (
+    <TreeContext.Provider value={{ onExtend }}>
     <div className="w-full h-full">
       <ReactFlow
         nodes={styledNodes}
@@ -105,6 +109,7 @@ function FutureTreeInner({
         </div>
       )}
     </div>
+    </TreeContext.Provider>
   );
 }
 
