@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+
+# Disallow private/authenticated routes
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /profile
+Disallow: /simulation/
+Disallow: /api/
+
+# Allow public pages
+Allow: /$
+Allow: /login
+Allow: /register
+
+Sitemap: https://delphi-oracle.app/sitemap.xml
