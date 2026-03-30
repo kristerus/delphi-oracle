@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/kerpu/.claude/projects/C--Users-kerpu--vscode-claudedispatch/memory//**)",
+      "Read(//c/Users/kerpu/.claude/projects/C--Users-kerpu--vscode-claudedispatch/memory/**)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo:*)"
+    ]
+  }
+}
