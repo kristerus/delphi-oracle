@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest) {
       id: sim.id,
       title: sim.title,
       status: sim.status,
-      category: sim.category,
+      categories: (sim.categories as string[]) ?? ["career"],
       nodeCount: sim.nodes.length,
       createdAt: sim.createdAt.toISOString().split("T")[0],
     }))

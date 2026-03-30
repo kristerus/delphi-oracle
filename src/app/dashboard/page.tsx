@@ -44,7 +44,7 @@ interface SimulationMeta {
   nodeCount: number;
   createdAt: string;
   status: "complete" | "generating" | "draft";
-  category?: SimulationCategory;
+  categories?: SimulationCategory[];
 }
 
 const CATEGORY_CONFIG: Record<SimulationCategory, {
@@ -134,6 +134,66 @@ const CATEGORY_CONFIG: Record<SimulationCategory, {
   },
 };
 
+/* ── Combination suggestions ── */
+const COMBINATION_SUGGESTIONS: Record<string, string[]> = {
+  "career+romantic": [
+    "Should I take the job offer across the country even if it means long-distance?",
+    "What if my career ambitions are slowly pulling us apart?",
+    "Should I stay in this city for my partner instead of chasing the opportunity?",
+  ],
+  "career+financial": [
+    "Should I quit my job to start a company and burn through my savings?",
+    "What if I took a 40% pay cut to pursue work I actually care about?",
+    "Should I stay for the equity vesting or leave for the dream role?",
+  ],
+  "career+health": [
+    "Should I leave my high-stress job even though it pays well?",
+    "What if burnout forces me to choose between my career and my health?",
+    "Should I take a sabbatical to recover or push through?",
+  ],
+  "career+personal": [
+    "Should I take the dream job abroad even though it changes everything?",
+    "What if I stopped optimizing for career success and started optimizing for meaning?",
+    "Should I follow the opportunity or stay where my life is rooted?",
+  ],
+  "romantic+financial": [
+    "Should we move in together even though our finances are incompatible?",
+    "What if this relationship is costing me my financial independence?",
+    "Should I invest in this relationship or my financial security first?",
+  ],
+  "romantic+health": [
+    "Should I tell them about my mental health struggles or keep it private?",
+    "What if caring for my partner is affecting my own wellbeing?",
+    "Should I prioritize healing myself before pursuing this connection?",
+  ],
+  "romantic+personal": [
+    "Should I change who I am to make this relationship work?",
+    "What if I chose myself instead of the relationship?",
+    "Should I confess my feelings even though the timing is terrible?",
+  ],
+  "financial+health": [
+    "Should I take the high-paying stressful job or the low-paying fulfilling one?",
+    "What if I invested in my health instead of my portfolio this year?",
+    "Should I spend money on therapy or keep saving aggressively?",
+  ],
+  "financial+personal": [
+    "Should I spend my savings on a year of travel or keep investing?",
+    "What if financial security isn't actually what I want from life?",
+    "Should I optimize for wealth or for freedom?",
+  ],
+  "health+personal": [
+    "Should I leave everything to focus on healing and reset?",
+    "What if prioritizing my mental health means disappointing everyone around me?",
+    "Should I upend my whole life to get well, or manage within it?",
+  ],
+};
+
+function getCombinationSuggestions(categories: SimulationCategory[]): string[] {
+  if (categories.length === 1) return CATEGORY_CONFIG[categories[0]].suggestions;
+  const key = [...categories].sort().join("+");
+  return COMBINATION_SUGGESTIONS[key] ?? CATEGORY_CONFIG[categories[0]].suggestions;
+}
+
 /* ── DB node shape returned by /api/simulations/[id] ── */
 interface DbNode {
   id: string;
@@ -198,9 +258,9 @@ function NewSimulationModal({
   onSimulate,
 }: {
   onClose: () => void;
-  onSimulate: (title: string, apiKey: string, provider: string, category: SimulationCategory, personalContext?: string) => Promise<void>;
+  onSimulate: (title: string, apiKey: string, provider: string, categories: SimulationCategory[], personalContext?: string) => Promise<void>;
 }) {
-  const [category, setCategory] = useState<SimulationCategory>("career");
+  const [categories, setCategories] = useState<SimulationCategory[]>(["career"]);
   const [title, setTitle] = useState("");
   const [personalContext, setPersonalContext] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -208,14 +268,29 @@ function NewSimulationModal({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const config = CATEGORY_CONFIG[category];
+  const isCombo = categories.length > 1;
+  const showPersonalContext = categories.some((c) => CATEGORY_CONFIG[c].showPersonalContext);
+  const suggestions = getCombinationSuggestions(categories);
+  const comboLabel = categories.map((c) => CATEGORY_CONFIG[c].label).join(" × ");
+  const placeholder = isCombo
+    ? `How does my ${categories.map((c) => CATEGORY_CONFIG[c].label.toLowerCase()).join(" and ")} life intersect in this decision?`
+    : CATEGORY_CONFIG[categories[0]].placeholder;
+
+  const toggleCategory = (cat: SimulationCategory) => {
+    setTitle("");
+    setCategories((prev) =>
+      prev.includes(cat)
+        ? prev.length > 1 ? prev.filter((c) => c !== cat) : prev
+        : [...prev, cat]
+    );
+  };
 
   const handle = async () => {
     if (!title.trim() || !apiKey.trim()) return;
     setGenerating(true);
     setError(null);
     try {
-      await onSimulate(title.trim(), apiKey.trim(), provider, category, personalContext.trim() || undefined);
+      await onSimulate(title.trim(), apiKey.trim(), provider, categories, personalContext.trim() || undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Simulation failed");
@@ -237,41 +312,62 @@ function NewSimulationModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 12 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative glass-card rounded-2xl p-7 w-full max-w-lg"
+        className="relative glass-card rounded-2xl p-7 w-full max-w-lg max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">New simulation</h2>
-            <p className="text-text-muted text-sm mt-0.5">Pose a life decision to explore</p>
+            <p className="text-text-muted text-sm mt-0.5">
+              {isCombo ? `Exploring ${comboLabel}` : "Pose a life decision to explore"}
+            </p>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Category picker */}
+        {/* Category multi-select */}
         <div className="mb-5">
-          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2.5">Category</p>
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider">Life domains</p>
+            {isCombo && (
+              <span className="text-xs text-oracle-400 font-medium">
+                {comboLabel} combination
+              </span>
+            )}
+          </div>
           <div className="flex gap-2 flex-wrap">
             {(Object.keys(CATEGORY_CONFIG) as SimulationCategory[]).map((cat) => {
               const cfg = CATEGORY_CONFIG[cat];
               const Icon = cfg.icon;
-              const isActive = category === cat;
+              const isActive = categories.includes(cat);
               return (
                 <button
                   key={cat}
-                  onClick={() => { setCategory(cat); setTitle(""); }}
+                  onClick={() => toggleCategory(cat)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150 ${
                     isActive ? cfg.activeClass : "border-border text-text-muted hover:text-text-secondary hover:border-border-bright"
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
                   {cfg.label}
+                  {isActive && categories.length > 1 && (
+                    <span className="w-3.5 h-3.5 rounded-full bg-current opacity-30 flex items-center justify-center text-[8px]">✓</span>
+                  )}
                 </button>
               );
             })}
           </div>
+          {isCombo && (
+            <motion.p
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-xs text-text-ghost mt-2"
+            >
+              The Oracle will generate futures where these life areas genuinely intersect and interact.
+            </motion.p>
+          )}
         </div>
 
         {/* Decision input */}
@@ -280,14 +376,14 @@ function NewSimulationModal({
           <textarea
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={config.placeholder}
+            placeholder={placeholder}
             rows={3}
             className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 resize-none"
           />
         </div>
 
-        {/* Personal context for relevant categories */}
-        {config.showPersonalContext && (
+        {/* Personal context */}
+        {showPersonalContext && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-text-secondary mb-2">
               Personal context <span className="text-text-ghost font-normal">(optional)</span>
@@ -296,9 +392,9 @@ function NewSimulationModal({
               value={personalContext}
               onChange={(e) => setPersonalContext(e.target.value)}
               placeholder={
-                category === "romantic"
-                  ? "Share any relevant context — how long you've known them, what's made you hesitate, etc."
-                  : "Any personal context that would help the Oracle give better predictions…"
+                categories.includes("romantic")
+                  ? "Share relevant context — how long you've known them, what's made you hesitate, your current situation…"
+                  : "Any personal context that would help the Oracle give sharper predictions…"
               }
               rows={2}
               className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 resize-none"
@@ -308,13 +404,15 @@ function NewSimulationModal({
 
         {/* Quick suggestions */}
         <div className="mb-4">
-          <p className="text-xs text-text-muted mb-2">Quick suggestions</p>
+          <p className="text-xs text-text-muted mb-2">
+            {isCombo ? `${comboLabel} scenarios` : "Quick suggestions"}
+          </p>
           <div className="flex flex-wrap gap-2">
-            {config.suggestions.map((s) => (
+            {suggestions.map((s) => (
               <button
                 key={s}
                 onClick={() => setTitle(s)}
-                className="text-xs px-3 py-1.5 rounded-lg bg-void-800/60 border border-border hover:border-oracle-800/60 hover:text-oracle-400 text-text-secondary transition-all duration-150"
+                className="text-xs px-3 py-1.5 rounded-lg bg-void-800/60 border border-border hover:border-oracle-800/60 hover:text-oracle-400 text-text-secondary transition-all duration-150 text-left"
               >
                 {s}
               </button>
@@ -348,9 +446,7 @@ function NewSimulationModal({
           </div>
           <p className="text-xs text-text-ghost">
             Save your key in{" "}
-            <a href="/profile" className="text-oracle-500 hover:underline">
-              Profile → AI Keys
-            </a>{" "}
+            <a href="/profile" className="text-oracle-500 hover:underline">Profile → AI Keys</a>{" "}
             to reuse it across sessions.
           </p>
         </div>
@@ -364,6 +460,8 @@ function NewSimulationModal({
         >
           {generating ? (
             <><Loader2 className="w-4 h-4 animate-spin" />Generating futures…</>
+          ) : isCombo ? (
+            <><Sparkles className="w-4 h-4" />Generate {comboLabel} tree</>
           ) : (
             <><Sparkles className="w-4 h-4" />Generate future tree</>
           )}
@@ -435,18 +533,17 @@ export default function DashboardPage() {
   }, [oracle.simulationId, oracle.nodes, oracle.edges]);
 
   const handleSimulate = useCallback(
-    async (title: string, apiKey: string, provider: string, category: SimulationCategory = "career", personalContext?: string) => {
+    async (title: string, apiKey: string, provider: string, categories: SimulationCategory[] = ["career"], personalContext?: string) => {
       setLastApiKey(apiKey);
       setLastProvider(provider as "claude" | "openai" | "custom");
 
-      // Build a minimal profile from session
       const profile = {
         name: session?.user?.name ?? "",
         skills: [],
         experience: [],
         education: [],
         personalContext,
-        category,
+        categories,
       };
 
       const result = await oracle.simulate({
@@ -454,7 +551,7 @@ export default function DashboardPage() {
         profile,
         apiKey,
         provider: provider as "claude" | "openai" | "custom",
-        category,
+        categories,
       });
 
       const newSim: SimulationMeta = {
@@ -463,7 +560,7 @@ export default function DashboardPage() {
         nodeCount: result.tree.nodes.length,
         createdAt: new Date().toISOString().split("T")[0],
         status: "complete",
-        category,
+        categories,
       };
 
       setSimulations((prev) => {
@@ -544,9 +641,8 @@ export default function DashboardPage() {
               Recent simulations
             </p>
             {simulations.map((sim) => {
-              const cat = sim.category ?? "career";
-              const catCfg = CATEGORY_CONFIG[cat];
-              const CatIcon = catCfg.icon;
+              const cats = (sim.categories ?? ["career"]) as SimulationCategory[];
+              const isCombo = cats.length > 1;
               return (
                 <button
                   key={sim.id}
@@ -560,15 +656,28 @@ export default function DashboardPage() {
                       : "hover:bg-void-800/60 text-text-secondary hover:text-text-primary"
                   }`}
                 >
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1.5">
                     <GitBranch className={`w-3.5 h-3.5 shrink-0 ${activeSimId === sim.id ? "text-oracle-500" : "text-text-muted"}`} />
                     <span className="text-sm font-medium truncate leading-tight flex-1">{sim.title}</span>
-                    <span className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md border shrink-0 ${catCfg.badgeClass}`}>
-                      <CatIcon className="w-2.5 h-2.5" />
-                      {catCfg.label}
-                    </span>
                   </div>
-                  <div className="flex items-center gap-2 pl-5">
+                  <div className="flex items-center gap-1.5 pl-5 flex-wrap">
+                    {isCombo ? (
+                      <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md border bg-oracle-900/40 text-oracle-400 border-oracle-800/40 shrink-0">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        {cats.map((c) => CATEGORY_CONFIG[c].label).join(" × ")}
+                      </span>
+                    ) : (
+                      (() => {
+                        const cfg = CATEGORY_CONFIG[cats[0]];
+                        const Icon = cfg.icon;
+                        return (
+                          <span className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md border shrink-0 ${cfg.badgeClass}`}>
+                            <Icon className="w-2.5 h-2.5" />
+                            {cfg.label}
+                          </span>
+                        );
+                      })()
+                    )}
                     <span className="text-xs text-text-ghost">{sim.nodeCount} nodes</span>
                     {sim.status === "generating" && (
                       <span className="flex items-center gap-1 text-xs text-oracle-600">

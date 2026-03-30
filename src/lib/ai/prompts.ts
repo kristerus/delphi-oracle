@@ -290,21 +290,91 @@ Be honest about uncertainty — romantic outcomes depend on timing, vulnerabilit
 Return valid JSON matching the schema above.`;
 }
 
-/* ─── Category prompt router ─────────────────────────────────────────────────── */
+/* ─── Category labels ────────────────────────────────────────────────────────── */
 
-export function buildCategorySystemPrompt(category: SimulationCategory): string {
-  if (category === "romantic") return buildRomanticSystemPrompt();
-  return buildSimulationSystemPrompt();
+const CATEGORY_LABELS: Record<SimulationCategory, string> = {
+  career: "Career",
+  romantic: "Romantic",
+  financial: "Financial",
+  health: "Health",
+  personal: "Personal",
+};
+
+/* ─── Combined / multi-category prompt router ───────────────────────────────── */
+
+export function buildCombinedSystemPrompt(categories: SimulationCategory[]): string {
+  if (categories.length === 1) {
+    if (categories[0] === "romantic") return buildRomanticSystemPrompt();
+    return buildSimulationSystemPrompt();
+  }
+
+  const domainList = categories.map((c) => CATEGORY_LABELS[c]).join(", ");
+  const isRomantic = categories.includes("romantic");
+
+  return `You are the Delphi Oracle — an AI life simulator generating futures at the intersection of multiple life domains: ${domainList}.
+
+Your role is to explore how these domains INTERACT — not address each one separately. Every branch must weave all ${categories.length} dimensions together, showing how decisions in one domain cascade through the others.
+
+CRITICAL RULES:
+1. Every branch must meaningfully involve ALL domains: ${domainList}
+2. Show cross-domain tension: the career leap that costs the relationship, the health crisis that clarifies financial priorities, the romantic choice that reshapes career direction
+3. The most powerful predictions emerge where domains reinforce or directly conflict with each other
+4. Do not generate branches that ignore any of the selected domains
+5. Probabilities must be realistic and sum to ~1.0${isRomantic ? "\n6. Romantic branches must honor emotional uncertainty — the other person's inner world cannot be known" : ""}
+6. Timeframes should reflect the slowest-moving domain in the interaction
+
+OUTPUT FORMAT (strict JSON):
+{
+  "branches": [
+    {
+      "title": "Short evocative title capturing the cross-domain arc (max 8 words)",
+      "description": "2-3 sentences showing how the domains interact in this specific branch",
+      "probability": 0.00 to 1.00,
+      "timeframe": "e.g. '6-12 months' or '2-4 years'",
+      "details": {
+        "pros": ["2-4 upsides spanning multiple domains"],
+        "cons": ["2-4 cross-domain risks and trade-offs"],
+        "keyEvents": ["3-5 pivotal moments where the domains intersect"],
+        "emotionalImpact": "one sentence on the human cost or reward of navigating these domains together"
+      }
+    }
+  ]
+}`;
 }
 
-export function buildCategoryUserPrompt(
-  category: SimulationCategory,
+export function buildCombinedUserPrompt(
+  categories: SimulationCategory[],
   decision: string,
   profile: UserProfile,
   branchCount: number
 ): string {
-  if (category === "romantic") return buildRomanticUserPrompt(decision, profile, branchCount);
-  return buildSimulationUserPrompt(decision, profile, branchCount);
+  if (categories.length === 1) {
+    if (categories[0] === "romantic") return buildRomanticUserPrompt(decision, profile, branchCount);
+    return buildSimulationUserPrompt(decision, profile, branchCount);
+  }
+
+  const domainList = categories.map((c) => CATEGORY_LABELS[c]).join(" × ");
+
+  return `Generate ${branchCount} realistic future branches for this person, exploring the intersection of ${domainList}:
+
+DECISION: "${decision}"
+
+PROFILE:
+- Name: ${profile.name || "Not provided"}
+- Personal context: ${profile.personalContext ?? "Not provided"}
+- Location: ${profile.location ?? "Not specified"}
+- Skills: ${profile.skills.join(", ") || "Not specified"}
+- Experience: ${
+    profile.experience
+      .map((e) => `${e.title} at ${e.company}${e.years ? ` (${e.years}y)` : ""}`)
+      .join("; ") || "Not specified"
+  }
+- Bio: ${profile.bio ?? "Not provided"}
+- Risk tolerance: ${profile.riskTolerance ?? "medium"}
+
+Generate exactly ${branchCount} branches where ${domainList} genuinely interweave. Each branch should show a DIFFERENT way these life areas interact — some in synergy, some in conflict, some in unexpected ways. Make the cross-domain dynamics the core of each prediction.
+
+Return valid JSON matching the schema above.`;
 }
 
 export function buildScrapeAnalysisPrompt(rawData: string): string {

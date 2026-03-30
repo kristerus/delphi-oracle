@@ -18,7 +18,7 @@ interface SimulateOptions {
   apiKey: string;
   provider?: "claude" | "openai" | "custom";
   model?: string;
-  category?: SimulationCategory;
+  categories?: SimulationCategory[];
 }
 
 interface ExtendOptions {

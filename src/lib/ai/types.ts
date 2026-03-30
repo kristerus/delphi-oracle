@@ -63,7 +63,7 @@ export interface UserProfile {
   riskTolerance?: "low" | "medium" | "high";
   timeHorizon?: string;
   personalContext?: string;
-  category?: SimulationCategory;
+  categories?: SimulationCategory[];
 }
 
 export type Granularity = "month" | "year" | "decade";
