@@ -1,10 +1,12 @@
 "use client";
 
 import { memo } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { motion } from "framer-motion";
 import { Calendar, TrendingUp, TrendingDown } from "lucide-react";
 import type { FutureNodeData } from "@/lib/ai/types";
+
+type FutureNodeType = Node<FutureNodeData, "futureNode">;
 import ExtendButton from "./ExtendButton";
 import { useTreeContext } from "./tree-context";
 
@@ -68,7 +70,7 @@ const FutureNode = memo(function FutureNode({
   data,
   selected,
   id,
-}: NodeProps<FutureNodeData>) {
+}: NodeProps<FutureNodeType>) {
   const isRoot = data.isRoot ?? false;
   const probability = data.probability ?? 0;
   const { onExtend } = useTreeContext();

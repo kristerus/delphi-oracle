@@ -11,6 +11,7 @@ import {
   type Node,
   type Edge,
   type NodeMouseHandler,
+  type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import FutureNode from "./FutureNode";
@@ -18,9 +19,9 @@ import BranchEdge from "./BranchEdge";
 import type { FutureTreeNode, FutureTreeEdge } from "@/lib/ai/types";
 import { TreeContext } from "./tree-context";
 
-const nodeTypes = {
-  futureNode: FutureNode,
-} as const;
+const nodeTypes: NodeTypes = {
+  futureNode: FutureNode as NodeTypes["futureNode"],
+};
 
 const edgeTypes = {
   branchEdge: BranchEdge,

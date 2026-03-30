@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
+// Skip env validation during `next build` so CI doesn't need real secrets.
+process.env.SKIP_ENV_VALIDATION = "true";
+
 const nextConfig: NextConfig = {
   // Required for the multi-stage Docker build (copies only what's needed into
   // the runner image via .next/standalone)
