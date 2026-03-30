@@ -62,6 +62,8 @@ export interface UserProfile {
   timeHorizon?: string;
 }
 
+export type Granularity = "month" | "year" | "decade";
+
 export interface FutureNodeData extends Record<string, unknown> {
   title: string;
   description: string;
@@ -69,6 +71,10 @@ export interface FutureNodeData extends Record<string, unknown> {
   timeframe: string;
   depth: number;
   isRoot?: boolean;
+  certainty?: number;
+  granularity?: Granularity;
+  timeframeStart?: string;
+  timeframeEnd?: string;
   details?: {
     pros: string[];
     cons: string[];

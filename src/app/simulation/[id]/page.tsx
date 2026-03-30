@@ -24,15 +24,58 @@ import {
   Keyboard,
   Sparkles,
   GitBranch,
+  GitMerge,
+  Network,
   Loader2,
 } from "lucide-react";
 import FutureNode from "@/components/tree/FutureNode";
 import BranchEdge from "@/components/tree/BranchEdge";
+import CertaintyIndicator from "@/components/timeline/CertaintyIndicator";
+import DepthControls from "@/components/timeline/DepthControls";
 import { DEMO_SIMULATION } from "@/lib/ai/types";
-import type { FutureTreeNode, FutureTreeEdge, FutureNodeData } from "@/lib/ai/types";
+import type { FutureTreeNode, FutureTreeEdge, FutureNodeData, Granularity } from "@/lib/ai/types";
 
 const nodeTypes = { futureNode: FutureNode } as const;
 const edgeTypes = { branchEdge: BranchEdge } as const;
+
+/* ─── View tab switcher ───────────────────────────────────────────────────── */
+function ViewTabs({ id }: { id: string }) {
+  return (
+    <div className="flex items-center gap-0.5 glass rounded-xl p-1 border border-border shrink-0">
+      {[
+        { label: "Tree", icon: GitBranch, href: `/simulation/${id}`, active: true },
+        { label: "Timeline", icon: GitMerge, href: `/simulation/${id}/timeline`, active: false },
+        { label: "Butterfly", icon: Network, href: "#", active: false, disabled: true },
+      ].map((tab) =>
+        tab.disabled ? (
+          <span
+            key={tab.label}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-text-ghost opacity-35 cursor-not-allowed"
+          >
+            <tab.icon className="w-3 h-3" />
+            <span className="hidden sm:inline">{tab.label}</span>
+          </span>
+        ) : (
+          <Link
+            key={tab.label}
+            href={tab.href}
+            className={`
+              flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+              transition-all duration-150
+              ${tab.active
+                ? "bg-oracle-500/15 text-oracle-400 border border-oracle-800/40"
+                : "text-text-muted hover:text-text-secondary"
+              }
+            `}
+          >
+            <tab.icon className="w-3 h-3" />
+            <span className="hidden sm:inline">{tab.label}</span>
+          </Link>
+        )
+      )}
+    </div>
+  );
+}
 
 /* ─── Keyboard shortcuts hint ─────────────────────────────────────────────── */
 function ShortcutsHint() {
@@ -116,13 +159,13 @@ function NodePanel({
           </button>
         </div>
 
-        {/* Probability bar */}
+        {/* Probability + Certainty */}
         <div className="glass rounded-xl p-4 mb-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-text-muted uppercase tracking-wider">Probability</span>
             <span className="text-lg font-bold text-oracle-400 font-mono">{probPct}%</span>
           </div>
-          <div className="h-1.5 bg-void-700 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-void-700 rounded-full overflow-hidden mb-3">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${probPct}%` }}
@@ -131,6 +174,17 @@ function NodePanel({
               style={{ background: "linear-gradient(90deg, oklch(72% 0.175 76), oklch(68% 0.115 276))" }}
             />
           </div>
+          {d.certainty !== undefined && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-text-ghost uppercase tracking-wider">Certainty</span>
+              <div className="flex items-center gap-2">
+                <CertaintyIndicator certainty={d.certainty} size={20} />
+                <span className="text-xs font-mono text-text-muted">
+                  {Math.round(d.certainty * 100)}%
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <h3 className="font-semibold text-text-primary mb-2">{d.title}</h3>
@@ -290,6 +344,7 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [certaintyThreshold, setCertaintyThreshold] = useState(0);
 
   // Use DEMO_SIMULATION for demo IDs; in production this would fetch from /api/simulations/[id]
   const simulation = DEMO_SIMULATION;
@@ -329,8 +384,13 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
   };
 
   const handleExtend = useCallback((nodeId: string) => {
-    // TODO: call /api/simulations/[id]/extend with the node context
+    // TODO: call /api/oracle/deep-extend with the node context
     console.log("[Delphi] Extending node:", nodeId);
+  }, []);
+
+  const handleExtendAll = useCallback(async (depth: number, granularity: Granularity) => {
+    console.log("[Delphi] Extend all leaves:", { depth, granularity });
+    await new Promise((r) => setTimeout(r, 800));
   }, []);
 
   // Listen for extend events from keyboard shortcut inside ReactFlow
@@ -367,6 +427,9 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
             <h1 className="text-sm font-semibold text-text-primary truncate">{simTitle}</h1>
           </div>
 
+          {/* View tabs */}
+          <ViewTabs id={id} />
+
           {/* Spacer */}
           <div className="flex-1" />
 
@@ -400,6 +463,15 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </header>
+
+      {/* ── Depth controls sub-bar ── */}
+      <div className="shrink-0 px-4 py-2 border-b border-border-subtle bg-void-900/40 backdrop-blur-sm">
+        <DepthControls
+          onExtendAll={handleExtendAll}
+          onCertaintyFilter={setCertaintyThreshold}
+          certaintyThreshold={certaintyThreshold}
+        />
+      </div>
 
       {/* ── Body ── */}
       <div className="flex-1 flex overflow-hidden">

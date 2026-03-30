@@ -5,6 +5,7 @@ import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { motion } from "framer-motion";
 import { Calendar, TrendingUp, TrendingDown } from "lucide-react";
 import type { FutureNodeData } from "@/lib/ai/types";
+import CertaintyIndicator from "@/components/timeline/CertaintyIndicator";
 
 type FutureNodeType = Node<FutureNodeData, "futureNode">;
 import ExtendButton from "./ExtendButton";
@@ -73,6 +74,7 @@ const FutureNode = memo(function FutureNode({
 }: NodeProps<FutureNodeType>) {
   const isRoot = data.isRoot ?? false;
   const probability = data.probability ?? 0;
+  const certainty = data.certainty;
   const { onExtend } = useTreeContext();
 
   const borderColor =
@@ -123,6 +125,20 @@ const FutureNode = memo(function FutureNode({
         <div className="absolute -top-3 left-4 flex items-center gap-1.5 bg-nebula-900 border border-nebula-700/60 px-2.5 py-0.5 rounded-full">
           <div className="w-1.5 h-1.5 rounded-full bg-nebula-400 animate-pulse" />
           <span className="text-xs font-medium text-nebula-300">Decision</span>
+        </div>
+      )}
+
+      {/* Depth badge + certainty — top-right corner */}
+      {!isRoot && (
+        <div className="absolute -top-2.5 right-3 flex items-center gap-1.5">
+          {data.depth > 1 && (
+            <div className="flex items-center gap-0.5 bg-void-800 border border-border px-1.5 py-0.5 rounded-full">
+              <span className="text-[9px] font-mono text-text-ghost">L{data.depth}</span>
+            </div>
+          )}
+          {certainty !== undefined && (
+            <CertaintyIndicator certainty={certainty} size={18} />
+          )}
         </div>
       )}
 
@@ -183,7 +199,7 @@ const FutureNode = memo(function FutureNode({
         )}
 
         {/* Extend button */}
-        {!isRoot && <ExtendButton nodeId={id} onExtend={onExtend} />}
+        {!isRoot && <ExtendButton nodeId={id} nodeDepth={data.depth} onExtend={onExtend} />}
       </div>
     </motion.div>
   );
