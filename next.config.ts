@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Required for the multi-stage Docker build (copies only what's needed into
+  // the runner image via .next/standalone)
+  output: "standalone",
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
