@@ -4,8 +4,8 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { simulations, futureNodes } from "@/lib/db/schema";
 import { callAI, parseAIJson } from "@/lib/ai/client";
-import { buildSimulationSystemPrompt, buildSimulationUserPrompt } from "@/lib/ai/prompts";
-import type { AIClientConfig, UserProfile, SimulationTree } from "@/lib/ai/types";
+import { buildCategorySystemPrompt, buildCategoryUserPrompt } from "@/lib/ai/prompts";
+import type { AIClientConfig, UserProfile, SimulationTree, SimulationCategory } from "@/lib/ai/types";
 import { nanoid } from "nanoid";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeUserText, sanitizeProfile } from "@/lib/sanitize";
@@ -18,6 +18,7 @@ interface SimulateRequest {
   apiKey: string;
   model?: string;
   branchCount?: number;
+  category?: SimulationCategory;
 }
 
 interface AIBranch {
@@ -85,11 +86,13 @@ export async function POST(req: NextRequest) {
       model: body.model,
     };
 
+    const category: SimulationCategory = body.category ?? "career";
     const messages = [
-      { role: "system" as const, content: buildSimulationSystemPrompt() },
+      { role: "system" as const, content: buildCategorySystemPrompt(category) },
       {
         role: "user" as const,
-        content: buildSimulationUserPrompt(
+        content: buildCategoryUserPrompt(
+          category,
           cleanDecision,
           cleanProfile,
           body.branchCount ?? 3
@@ -119,6 +122,7 @@ export async function POST(req: NextRequest) {
       userId: session.user.id,
       title: cleanDecision,
       rootNodeId: rootId,
+      category,
       status: "complete",
       model: aiConfig.model ?? aiConfig.provider,
     });

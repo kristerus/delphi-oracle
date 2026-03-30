@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { FutureTreeNode, FutureTreeEdge, SimulationTree, UserProfile, Granularity } from "@/lib/ai/types";
+import type { FutureTreeNode, FutureTreeEdge, SimulationTree, UserProfile, Granularity, SimulationCategory } from "@/lib/ai/types";
 
 interface OracleState {
   nodes: FutureTreeNode[];
@@ -18,6 +18,7 @@ interface SimulateOptions {
   apiKey: string;
   provider?: "claude" | "openai" | "custom";
   model?: string;
+  category?: SimulationCategory;
 }
 
 interface ExtendOptions {

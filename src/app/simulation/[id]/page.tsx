@@ -340,6 +340,12 @@ function NodePanel({
 
         {d.details && (
           <div className="space-y-4 mb-5">
+            {d.details.emotionalImpact && (
+              <div className="glass rounded-xl px-4 py-3 border border-nebula-800/30">
+                <p className="text-xs font-semibold text-nebula-400 uppercase tracking-wider mb-1.5">Emotional arc</p>
+                <p className="text-sm text-text-secondary italic leading-relaxed">{d.details.emotionalImpact}</p>
+              </div>
+            )}
             {d.details.pros && (
               <div>
                 <p className="text-xs font-semibold text-signal-400 uppercase tracking-wider mb-2">Upside</p>

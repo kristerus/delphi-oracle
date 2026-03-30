@@ -95,6 +95,11 @@ export const simulations = pgTable("simulations", {
   title: text("title").notNull(),
   description: text("description"),
   rootNodeId: uuid("root_node_id"),
+  category: text("category", {
+    enum: ["career", "romantic", "financial", "health", "personal"],
+  })
+    .notNull()
+    .default("career"),
   status: text("status", {
     enum: ["draft", "generating", "complete", "error"],
   })

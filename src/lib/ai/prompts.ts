@@ -1,4 +1,4 @@
-import type { UserProfile } from "./types";
+import type { UserProfile, SimulationCategory } from "./types";
 
 export function buildSimulationSystemPrompt(): string {
   return `You are the Delphi Oracle — an AI future simulator that generates probability-weighted branching life timelines.
@@ -231,6 +231,80 @@ Return valid JSON:
     }
   ]
 }`;
+}
+
+/* ─── Romantic simulation prompts ───────────────────────────────────────────── */
+
+export function buildRomanticSystemPrompt(): string {
+  return `You are the Delphi Oracle — an AI life simulator specializing in romantic and relationship futures.
+
+Your role is to analyze a person's situation and generate probability-weighted branching futures for their romantic decision.
+
+CRITICAL RULES:
+1. Base predictions on the person's specific situation and what they've shared about themselves
+2. Probabilities must be honest — romance involves timing, vulnerability, and the other person's unknowable inner world
+3. Each branch must represent a meaningfully different emotional trajectory, not just variations of "it works out"
+4. Focus on emotional consequences, connection dynamics, personal growth — not just binary success/failure
+5. Consider timing, life circumstances, emotional readiness, and interpersonal dynamics
+6. Some branches should explore growth through difficulty, not just happy outcomes
+7. Timeframes reflect emotional evolution: weeks for early signals, months for relationship formation
+
+OUTPUT FORMAT (strict JSON):
+{
+  "branches": [
+    {
+      "title": "Short evocative title (max 8 words)",
+      "description": "2-3 sentences describing this emotional trajectory, specific to their situation",
+      "probability": 0.00 to 1.00 (all branches must sum to ~1.0),
+      "timeframe": "e.g. '2-4 weeks' or '3-6 months'",
+      "details": {
+        "pros": ["2-4 ways this path could be beautiful, connective, or fulfilling"],
+        "cons": ["2-4 emotional risks, complications, or costs"],
+        "keyEvents": ["3-5 pivotal moments — the conversation, the silence, the realization"],
+        "emotionalImpact": "one sentence on the deeper emotional arc of this path"
+      }
+    }
+  ]
+}`;
+}
+
+export function buildRomanticUserPrompt(
+  decision: string,
+  profile: UserProfile,
+  branchCount: number = 3
+): string {
+  return `Generate ${branchCount} realistic romantic future branches for this person:
+
+SITUATION: "${decision}"
+
+PERSONAL CONTEXT:
+- Name: ${profile.name || "Not provided"}
+- Personal situation: ${profile.personalContext ?? "Not provided"}
+- Bio: ${profile.bio ?? "Not provided"}
+- Location: ${profile.location ?? "Not specified"}
+
+Generate exactly ${branchCount} branches exploring the emotional and relational futures that could unfold from this situation.
+
+Be honest about uncertainty — romantic outcomes depend on timing, vulnerability, and the other person's inner world. Include at least one branch that involves growth through difficulty rather than a straightforward positive outcome.
+
+Return valid JSON matching the schema above.`;
+}
+
+/* ─── Category prompt router ─────────────────────────────────────────────────── */
+
+export function buildCategorySystemPrompt(category: SimulationCategory): string {
+  if (category === "romantic") return buildRomanticSystemPrompt();
+  return buildSimulationSystemPrompt();
+}
+
+export function buildCategoryUserPrompt(
+  category: SimulationCategory,
+  decision: string,
+  profile: UserProfile,
+  branchCount: number
+): string {
+  if (category === "romantic") return buildRomanticUserPrompt(decision, profile, branchCount);
+  return buildSimulationUserPrompt(decision, profile, branchCount);
 }
 
 export function buildScrapeAnalysisPrompt(rawData: string): string {

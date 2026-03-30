@@ -44,6 +44,8 @@ export interface ExtendRequest {
   branchCount?: number;
 }
 
+export type SimulationCategory = "career" | "romantic" | "financial" | "health" | "personal";
+
 export interface UserProfile {
   name: string;
   bio?: string;
@@ -60,6 +62,8 @@ export interface UserProfile {
   }>;
   riskTolerance?: "low" | "medium" | "high";
   timeHorizon?: string;
+  personalContext?: string;
+  category?: SimulationCategory;
 }
 
 export type Granularity = "month" | "year" | "decade";
@@ -81,6 +85,7 @@ export interface FutureNodeData extends Record<string, unknown> {
     keyEvents: string[];
     skillsNeeded?: string[];
     financialImpact?: string;
+    emotionalImpact?: string;
   };
   metadata?: {
     model?: string;

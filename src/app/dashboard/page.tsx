@@ -13,13 +13,18 @@ import {
   Loader2,
   Info,
   Key,
+  Briefcase,
+  Heart,
+  TrendingUp,
+  Activity,
+  User,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/layout/Navbar";
 import { DEMO_SIMULATION } from "@/lib/ai/types";
 import { authClient } from "@/lib/auth-client";
 import { useOracle } from "@/hooks/useOracle";
-import type { SimulationTree, FutureTreeNode, FutureTreeEdge, Granularity } from "@/lib/ai/types";
+import type { SimulationTree, FutureTreeNode, FutureTreeEdge, Granularity, SimulationCategory } from "@/lib/ai/types";
 
 const FutureTree = dynamic(() => import("@/components/tree/FutureTree"), {
   ssr: false,
@@ -39,7 +44,95 @@ interface SimulationMeta {
   nodeCount: number;
   createdAt: string;
   status: "complete" | "generating" | "draft";
+  category?: SimulationCategory;
 }
+
+const CATEGORY_CONFIG: Record<SimulationCategory, {
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  activeClass: string;
+  badgeClass: string;
+  suggestions: string[];
+  placeholder: string;
+  showPersonalContext: boolean;
+}> = {
+  career: {
+    label: "Career",
+    icon: Briefcase,
+    color: "oracle",
+    activeClass: "border-oracle-700/60 bg-oracle-500/10 text-oracle-400",
+    badgeClass: "bg-oracle-900/50 text-oracle-400 border-oracle-800/40",
+    suggestions: [
+      "Should I change careers to AI engineering?",
+      "What if I started my own company?",
+      "Should I go back to school for a master's?",
+      "What happens if I move to a new city for work?",
+    ],
+    placeholder: "What if I left my corporate job to start a company in the next 12 months?",
+    showPersonalContext: false,
+  },
+  romantic: {
+    label: "Romantic",
+    icon: Heart,
+    color: "hazard",
+    activeClass: "border-hazard-700/60 bg-hazard-500/10 text-hazard-400",
+    badgeClass: "bg-hazard-900/50 text-hazard-400 border-hazard-800/40",
+    suggestions: [
+      "Should I tell them how I feel?",
+      "What if I ask them out this week?",
+      "Should I end this relationship?",
+      "What if I try long-distance?",
+    ],
+    placeholder: "I met someone at a conference and we've been texting. Should I tell them I'm interested?",
+    showPersonalContext: true,
+  },
+  financial: {
+    label: "Financial",
+    icon: TrendingUp,
+    color: "signal",
+    activeClass: "border-signal-700/60 bg-signal-500/10 text-signal-400",
+    badgeClass: "bg-signal-900/50 text-signal-400 border-signal-800/40",
+    suggestions: [
+      "Should I invest heavily in index funds now?",
+      "What if I bought a house this year?",
+      "Should I quit my job to freelance full-time?",
+      "What if I moved to a lower cost-of-living city?",
+    ],
+    placeholder: "Should I put 50% of my savings into index funds over the next year?",
+    showPersonalContext: false,
+  },
+  health: {
+    label: "Health",
+    icon: Activity,
+    color: "nebula",
+    activeClass: "border-nebula-700/60 bg-nebula-500/10 text-nebula-400",
+    badgeClass: "bg-nebula-900/50 text-nebula-400 border-nebula-800/40",
+    suggestions: [
+      "What if I trained for a marathon?",
+      "Should I try a 6-month diet change?",
+      "What if I got therapy for burnout?",
+      "Should I take a 3-month sabbatical?",
+    ],
+    placeholder: "What if I committed to training for a marathon over the next 6 months?",
+    showPersonalContext: true,
+  },
+  personal: {
+    label: "Personal",
+    icon: User,
+    color: "nebula",
+    activeClass: "border-nebula-700/60 bg-nebula-500/10 text-nebula-400",
+    badgeClass: "bg-nebula-900/50 text-nebula-400 border-nebula-800/40",
+    suggestions: [
+      "What if I moved to a different country?",
+      "Should I reconnect with old friends?",
+      "What if I took a gap year?",
+      "Should I learn a completely new skill?",
+    ],
+    placeholder: "What if I took a year off to travel and figure out what I really want?",
+    showPersonalContext: true,
+  },
+};
 
 /* ── DB node shape returned by /api/simulations/[id] ── */
 interface DbNode {
@@ -105,33 +198,30 @@ function NewSimulationModal({
   onSimulate,
 }: {
   onClose: () => void;
-  onSimulate: (title: string, apiKey: string, provider: string) => Promise<void>;
+  onSimulate: (title: string, apiKey: string, provider: string, category: SimulationCategory, personalContext?: string) => Promise<void>;
 }) {
+  const [category, setCategory] = useState<SimulationCategory>("career");
   const [title, setTitle] = useState("");
+  const [personalContext, setPersonalContext] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState("claude");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const config = CATEGORY_CONFIG[category];
 
   const handle = async () => {
     if (!title.trim() || !apiKey.trim()) return;
     setGenerating(true);
     setError(null);
     try {
-      await onSimulate(title.trim(), apiKey.trim(), provider);
+      await onSimulate(title.trim(), apiKey.trim(), provider, category, personalContext.trim() || undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Simulation failed");
       setGenerating(false);
     }
   };
-
-  const suggestions = [
-    "Should I change careers to AI engineering?",
-    "What if I moved to a new city?",
-    "Should I start my own company?",
-    "What happens if I go back to school?",
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -155,31 +245,72 @@ function NewSimulationModal({
             <h2 className="text-lg font-semibold text-text-primary">New simulation</h2>
             <p className="text-text-muted text-sm mt-0.5">Pose a life decision to explore</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-text-muted hover:text-text-primary transition-colors p-1"
-          >
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Category picker */}
+        <div className="mb-5">
+          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2.5">Category</p>
+          <div className="flex gap-2 flex-wrap">
+            {(Object.keys(CATEGORY_CONFIG) as SimulationCategory[]).map((cat) => {
+              const cfg = CATEGORY_CONFIG[cat];
+              const Icon = cfg.icon;
+              const isActive = category === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => { setCategory(cat); setTitle(""); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150 ${
+                    isActive ? cfg.activeClass : "border-border text-text-muted hover:text-text-secondary hover:border-border-bright"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Decision input */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Your decision
-          </label>
+          <label className="block text-sm font-medium text-text-secondary mb-2">Your decision</label>
           <textarea
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="What if I left my corporate job to start a company in the next 12 months?"
+            placeholder={config.placeholder}
             rows={3}
             className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 resize-none"
           />
         </div>
 
+        {/* Personal context for relevant categories */}
+        {config.showPersonalContext && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Personal context <span className="text-text-ghost font-normal">(optional)</span>
+            </label>
+            <textarea
+              value={personalContext}
+              onChange={(e) => setPersonalContext(e.target.value)}
+              placeholder={
+                category === "romantic"
+                  ? "Share any relevant context — how long you've known them, what's made you hesitate, etc."
+                  : "Any personal context that would help the Oracle give better predictions…"
+              }
+              rows={2}
+              className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 resize-none"
+            />
+          </div>
+        )}
+
+        {/* Quick suggestions */}
         <div className="mb-4">
-          <p className="text-xs text-text-muted mb-2.5">Quick suggestions</p>
+          <p className="text-xs text-text-muted mb-2">Quick suggestions</p>
           <div className="flex flex-wrap gap-2">
-            {suggestions.map((s) => (
+            {config.suggestions.map((s) => (
               <button
                 key={s}
                 onClick={() => setTitle(s)}
@@ -191,7 +322,7 @@ function NewSimulationModal({
           </div>
         </div>
 
-        {/* API Key section */}
+        {/* API key */}
         <div className="mb-4 glass rounded-xl p-4 space-y-3 border border-border-subtle">
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <Key className="w-3.5 h-3.5" />
@@ -224,9 +355,7 @@ function NewSimulationModal({
           </p>
         </div>
 
-        {error && (
-          <p className="text-xs text-hazard-400 mb-3">{error}</p>
-        )}
+        {error && <p className="text-xs text-hazard-400 mb-3">{error}</p>}
 
         <button
           onClick={handle}
@@ -234,15 +363,9 @@ function NewSimulationModal({
           className="w-full flex items-center justify-center gap-2 bg-oracle-500 hover:bg-oracle-400 disabled:opacity-50 disabled:cursor-not-allowed text-void-950 font-semibold py-3 rounded-xl transition-all duration-200 hover:shadow-[0_0_24px_oklch(72%_0.175_76_/_0.5)] text-sm"
         >
           {generating ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Generating futures…
-            </>
+            <><Loader2 className="w-4 h-4 animate-spin" />Generating futures…</>
           ) : (
-            <>
-              <Sparkles className="w-4 h-4" />
-              Generate future tree
-            </>
+            <><Sparkles className="w-4 h-4" />Generate future tree</>
           )}
         </button>
       </motion.div>
@@ -312,7 +435,7 @@ export default function DashboardPage() {
   }, [oracle.simulationId, oracle.nodes, oracle.edges]);
 
   const handleSimulate = useCallback(
-    async (title: string, apiKey: string, provider: string) => {
+    async (title: string, apiKey: string, provider: string, category: SimulationCategory = "career", personalContext?: string) => {
       setLastApiKey(apiKey);
       setLastProvider(provider as "claude" | "openai" | "custom");
 
@@ -322,6 +445,8 @@ export default function DashboardPage() {
         skills: [],
         experience: [],
         education: [],
+        personalContext,
+        category,
       };
 
       const result = await oracle.simulate({
@@ -329,6 +454,7 @@ export default function DashboardPage() {
         profile,
         apiKey,
         provider: provider as "claude" | "openai" | "custom",
+        category,
       });
 
       const newSim: SimulationMeta = {
@@ -337,6 +463,7 @@ export default function DashboardPage() {
         nodeCount: result.tree.nodes.length,
         createdAt: new Date().toISOString().split("T")[0],
         status: "complete",
+        category,
       };
 
       setSimulations((prev) => {
@@ -416,38 +543,47 @@ export default function DashboardPage() {
             <p className="text-xs font-medium text-text-ghost uppercase tracking-wider px-2 py-1.5">
               Recent simulations
             </p>
-            {simulations.map((sim) => (
-              <button
-                key={sim.id}
-                onClick={() => {
-                  setActiveSimId(sim.id);
-                  setSelectedNodeId(null);
-                }}
-                className={`w-full text-left px-3 py-3 rounded-xl transition-all duration-150 group ${
-                  activeSimId === sim.id
-                    ? "bg-oracle-900/40 border border-oracle-800/50 text-text-primary"
-                    : "hover:bg-void-800/60 text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <GitBranch className={`w-3.5 h-3.5 shrink-0 ${activeSimId === sim.id ? "text-oracle-500" : "text-text-muted"}`} />
-                  <span className="text-sm font-medium truncate leading-tight">{sim.title}</span>
-                </div>
-                <div className="flex items-center gap-2 pl-5">
-                  <span className="text-xs text-text-ghost">{sim.nodeCount} nodes</span>
-                  {sim.status === "generating" && (
-                    <span className="flex items-center gap-1 text-xs text-oracle-600">
-                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                      Generating
+            {simulations.map((sim) => {
+              const cat = sim.category ?? "career";
+              const catCfg = CATEGORY_CONFIG[cat];
+              const CatIcon = catCfg.icon;
+              return (
+                <button
+                  key={sim.id}
+                  onClick={() => {
+                    setActiveSimId(sim.id);
+                    setSelectedNodeId(null);
+                  }}
+                  className={`w-full text-left px-3 py-3 rounded-xl transition-all duration-150 group ${
+                    activeSimId === sim.id
+                      ? "bg-oracle-900/40 border border-oracle-800/50 text-text-primary"
+                      : "hover:bg-void-800/60 text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <GitBranch className={`w-3.5 h-3.5 shrink-0 ${activeSimId === sim.id ? "text-oracle-500" : "text-text-muted"}`} />
+                    <span className="text-sm font-medium truncate leading-tight flex-1">{sim.title}</span>
+                    <span className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md border shrink-0 ${catCfg.badgeClass}`}>
+                      <CatIcon className="w-2.5 h-2.5" />
+                      {catCfg.label}
                     </span>
-                  )}
-                  <span className="text-xs text-text-ghost flex items-center gap-1 ml-auto">
-                    <Calendar className="w-2.5 h-2.5" />
-                    {sim.createdAt}
-                  </span>
-                </div>
-              </button>
-            ))}
+                  </div>
+                  <div className="flex items-center gap-2 pl-5">
+                    <span className="text-xs text-text-ghost">{sim.nodeCount} nodes</span>
+                    {sim.status === "generating" && (
+                      <span className="flex items-center gap-1 text-xs text-oracle-600">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        Generating
+                      </span>
+                    )}
+                    <span className="text-xs text-text-ghost flex items-center gap-1 ml-auto">
+                      <Calendar className="w-2.5 h-2.5" />
+                      {sim.createdAt}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           <div className="p-3 border-t border-border-subtle">
