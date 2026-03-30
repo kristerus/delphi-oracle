@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Frontend (Next.js) ──────────────────────────────────────────────────────
+  frontend:
+    name: Frontend — typecheck / lint / build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+        env:
+          SKIP_ENV_VALIDATION: "true"
+
+      - name: ESLint
+        run: npm run lint
+        env:
+          SKIP_ENV_VALIDATION: "true"
+
+      - name: Build
+        run: npm run build
+        env:
+          # Provide minimal fake values so env validation passes during build
+          DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+          BETTER_AUTH_SECRET: "test-secret-minimum-32-characters-here"
+          BETTER_AUTH_URL: "http://localhost:3000"
+          GITHUB_CLIENT_ID: "test"
+          GITHUB_CLIENT_SECRET: "test"
+          BACKEND_URL: "http://localhost:8000"
+          BACKEND_API_KEY: "test-backend-key"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+
+  # ── Python backend ──────────────────────────────────────────────────────────
+  backend:
+    name: Backend — ruff lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint with ruff
+        run: ruff check .
