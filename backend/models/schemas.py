@@ -16,6 +16,15 @@ class Platform(str, Enum):
     PERSONAL_SITE = "personal_site"
     NEWS = "news"
     ACADEMIC = "academic"
+    STACK_OVERFLOW = "stackoverflow"
+    CRUNCHBASE = "crunchbase"
+    MEDIUM = "medium"
+    DEVTO = "devto"
+    ANGELLIST = "angellist"
+    YOUTUBE = "youtube"
+    PATENTS = "patents"
+    DEVPOST = "devpost"
+    KAGGLE = "kaggle"
 
 
 class AIProvider(str, Enum):
@@ -31,6 +40,7 @@ class ScrapeRequest(BaseModel):
     platforms: list[Platform] = Field(default_factory=list)
     user_id: Optional[str] = None
     include_full_content: bool = False
+    hints: dict[str, str] = Field(default_factory=dict)  # e.g. {"location": "SF", "company": "Google"}
 
 
 class ScrapeResult(BaseModel):
@@ -41,6 +51,7 @@ class ScrapeResult(BaseModel):
     full_content: Optional[str] = None
     scraped_at: str
     confidence: float = Field(ge=0.0, le=1.0)
+    structured_data: dict[str, Any] = Field(default_factory=dict)  # platform-specific extracted fields
 
 
 class ExtractedProfile(BaseModel):
@@ -70,6 +81,108 @@ class ScrapeResponse(BaseModel):
     footprint: Optional[DigitalFootprint] = None
     errors: list[dict[str, str]] = Field(default_factory=list)
     status: str  # "complete" | "partial" | "failed"
+
+
+# ─── Async scrape job ──────────────────────────────────────────────────────────
+
+class ScrapeJobStartResponse(BaseModel):
+    job_id: str
+    status: str  # "pending"
+
+
+class ScrapeJobStatusRequest(BaseModel):
+    job_id: str
+
+
+class ScrapeJobStatusResponse(BaseModel):
+    job_id: str
+    status: str  # "pending" | "running" | "complete" | "partial" | "failed"
+    progress: dict[str, str]  # platform -> "pending" | "running" | "done" | "error"
+    results_count: int
+    error_count: int
+
+
+# ─── Enrichment ───────────────────────────────────────────────────────────────
+
+class SkillWeight(BaseModel):
+    name: str
+    weight: float = Field(ge=0.0, le=1.0)
+    sources: list[str] = Field(default_factory=list)
+
+
+class WorkExperience(BaseModel):
+    company: str
+    role: str
+    start: Optional[str] = None
+    end: Optional[str] = None
+    description: Optional[str] = None
+    sources: list[str] = Field(default_factory=list)
+
+
+class EducationEntry(BaseModel):
+    institution: str
+    degree: Optional[str] = None
+    field: Optional[str] = None
+    years: Optional[str] = None
+    gpa: Optional[str] = None
+    sources: list[str] = Field(default_factory=list)
+
+
+class UnifiedProfile(BaseModel):
+    name: Optional[str] = None
+    headline: Optional[str] = None
+    location: Optional[str] = None
+    bio: Optional[str] = None
+    skills: list[SkillWeight] = Field(default_factory=list)
+    work_experience: list[WorkExperience] = Field(default_factory=list)
+    education: list[EducationEntry] = Field(default_factory=list)
+    publications: list[dict[str, Any]] = Field(default_factory=list)
+    patents: list[dict[str, Any]] = Field(default_factory=list)
+    projects: list[dict[str, Any]] = Field(default_factory=list)
+    social_connections: list[str] = Field(default_factory=list)
+    location_history: list[str] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
+    awards: list[str] = Field(default_factory=list)
+    social_handles: dict[str, str] = Field(default_factory=dict)
+    urls: list[str] = Field(default_factory=list)
+    data_quality: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class EnrichRequest(BaseModel):
+    footprint: DigitalFootprint
+    api_key: str
+    user_id: Optional[str] = None
+
+
+class EnrichResponse(BaseModel):
+    profile: UnifiedProfile
+    processing_time_ms: int
+    sources_used: int
+
+
+# ─── Identity resolution ──────────────────────────────────────────────────────
+
+class IdentityCandidate(BaseModel):
+    platform: Platform
+    url: str
+    title: str
+    snippet: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    reasoning: str
+
+
+class ResolveIdentityRequest(BaseModel):
+    name: str
+    hints: dict[str, str] = Field(default_factory=dict)
+    candidates: list[ScrapeResult]
+    api_key: str
+    user_id: Optional[str] = None
+
+
+class ResolveIdentityResponse(BaseModel):
+    matched: list[IdentityCandidate]
+    rejected: list[IdentityCandidate]
+    processing_time_ms: int
 
 
 # ─── Analysis ─────────────────────────────────────────────────────────────────
