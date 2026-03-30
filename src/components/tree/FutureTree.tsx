@@ -16,7 +16,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import FutureNode from "./FutureNode";
 import BranchEdge from "./BranchEdge";
-import type { FutureTreeNode, FutureTreeEdge } from "@/lib/ai/types";
+import type { FutureTreeNode, FutureTreeEdge, Granularity } from "@/lib/ai/types";
 import { TreeContext } from "./tree-context";
 
 const nodeTypes: NodeTypes = {
@@ -32,7 +32,7 @@ interface FutureTreeProps {
   edges: FutureTreeEdge[];
   onNodeSelect?: (nodeId: string | null) => void;
   selectedNodeId?: string | null;
-  onExtend?: (nodeId: string) => Promise<void>;
+  onExtend?: (nodeId: string, depth?: number, granularity?: Granularity) => Promise<void>;
 }
 
 function FutureTreeInner({

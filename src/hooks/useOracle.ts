@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { FutureTreeNode, FutureTreeEdge, SimulationTree, UserProfile } from "@/lib/ai/types";
+import type { FutureTreeNode, FutureTreeEdge, SimulationTree, UserProfile, Granularity } from "@/lib/ai/types";
 
 interface OracleState {
   nodes: FutureTreeNode[];
@@ -25,6 +25,17 @@ interface ExtendOptions {
   profile: UserProfile;
   apiKey: string;
   provider?: "claude" | "openai" | "custom";
+}
+
+interface DeepExtendOptions {
+  nodeId: string;
+  simulationId: string;
+  profile: UserProfile;
+  apiKey: string;
+  provider?: "claude" | "openai" | "custom";
+  depth?: number;
+  granularity?: Granularity;
+  branchCount?: number;
 }
 
 export function useOracle() {
@@ -95,8 +106,7 @@ export function useOracle() {
           throw new Error(err.error ?? `HTTP ${response.status}`);
         }
 
-        const data: { nodes: FutureTreeNode[]; edges: FutureTreeEdge[] } =
-          await response.json();
+        const data: { nodes: FutureTreeNode[]; edges: FutureTreeEdge[] } = await response.json();
 
         setState((s) => {
           const extending = new Set(s.extending);
@@ -126,6 +136,56 @@ export function useOracle() {
     [state.simulationId]
   );
 
+  const deepExtendNode = useCallback(
+    async (options: DeepExtendOptions) => {
+      setState((s) => ({
+        ...s,
+        extending: new Set([...s.extending, options.nodeId]),
+        error: null,
+      }));
+
+      try {
+        const response = await fetch("/api/oracle/deep-extend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(options),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(err.error ?? `HTTP ${response.status}`);
+        }
+
+        const data: { nodes: FutureTreeNode[]; edges: FutureTreeEdge[] } = await response.json();
+
+        setState((s) => {
+          const extending = new Set(s.extending);
+          extending.delete(options.nodeId);
+          return {
+            ...s,
+            nodes: [...s.nodes, ...data.nodes],
+            edges: [...s.edges, ...data.edges],
+            extending,
+          };
+        });
+
+        return data;
+      } catch (err) {
+        setState((s) => {
+          const extending = new Set(s.extending);
+          extending.delete(options.nodeId);
+          return {
+            ...s,
+            extending,
+            error: err instanceof Error ? err.message : "Deep extension failed",
+          };
+        });
+        throw err;
+      }
+    },
+    []
+  );
+
   const reset = useCallback(() => {
     setState({
       nodes: [],
@@ -141,6 +201,7 @@ export function useOracle() {
     ...state,
     simulate,
     extendNode,
+    deepExtendNode,
     reset,
   };
 }

@@ -19,7 +19,7 @@ import Navbar from "@/components/layout/Navbar";
 import { DEMO_SIMULATION } from "@/lib/ai/types";
 import { authClient } from "@/lib/auth-client";
 import { useOracle } from "@/hooks/useOracle";
-import type { SimulationTree, FutureTreeNode, FutureTreeEdge } from "@/lib/ai/types";
+import type { SimulationTree, FutureTreeNode, FutureTreeEdge, Granularity } from "@/lib/ai/types";
 
 const FutureTree = dynamic(() => import("@/components/tree/FutureTree"), {
   ssr: false,
@@ -48,7 +48,11 @@ interface DbNode {
   title: string;
   description: string;
   probability: number;
+  certainty: number | null;
   timeframe: string | null;
+  timeframeStart: string | null;
+  timeframeEnd: string | null;
+  granularity: "month" | "year" | "decade" | null;
   depth: number;
   details: unknown;
   positionX: number | null;
@@ -64,7 +68,11 @@ function dbNodesToTree(nodes: DbNode[]): SimulationTree {
       title: n.title,
       description: n.description,
       probability: n.probability,
+      certainty: n.certainty ?? undefined,
       timeframe: n.timeframe ?? "",
+      timeframeStart: n.timeframeStart ?? undefined,
+      timeframeEnd: n.timeframeEnd ?? undefined,
+      granularity: n.granularity ?? undefined,
       depth: n.depth,
       isRoot: n.parentId === null,
       details: n.details as FutureTreeNode["data"]["details"],
@@ -342,20 +350,32 @@ export default function DashboardPage() {
   );
 
   const handleExtend = useCallback(
-    async (nodeId: string) => {
-      if (!lastApiKey) return;
+    async (nodeId: string, depth = 1, granularity?: Granularity) => {
+      if (!lastApiKey || !oracle.simulationId) return;
       const profile = {
         name: session?.user?.name ?? "",
         skills: [],
         experience: [],
         education: [],
       };
-      await oracle.extendNode({
-        nodeId,
-        profile,
-        apiKey: lastApiKey,
-        provider: lastProvider,
-      });
+      if (depth > 1) {
+        await oracle.deepExtendNode({
+          nodeId,
+          simulationId: oracle.simulationId,
+          profile,
+          apiKey: lastApiKey,
+          provider: lastProvider,
+          depth,
+          granularity,
+        });
+      } else {
+        await oracle.extendNode({
+          nodeId,
+          profile,
+          apiKey: lastApiKey,
+          provider: lastProvider,
+        });
+      }
     },
     [session, oracle, lastApiKey, lastProvider]
   );
