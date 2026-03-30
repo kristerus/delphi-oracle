@@ -1,9 +1,10 @@
 /* ─── Scraper types ─────────────────────────────────────────────────────────── */
 
 export interface ScrapeRequest {
-  query: string;         // Person's name / identifier
+  query: string;
   platforms?: Platform[];
   includeContent?: boolean;
+  hints?: Record<string, string>; // e.g. { location: "SF", company: "Google" }
 }
 
 export type Platform =
@@ -12,7 +13,16 @@ export type Platform =
   | "twitter"
   | "personal_site"
   | "news"
-  | "academic";
+  | "academic"
+  | "stackoverflow"
+  | "crunchbase"
+  | "medium"
+  | "devto"
+  | "angellist"
+  | "youtube"
+  | "patents"
+  | "devpost"
+  | "kaggle";
 
 export interface ScrapeResult {
   platform: Platform;
@@ -21,7 +31,8 @@ export interface ScrapeResult {
   snippet: string;
   fullContent?: string;
   scrapedAt: string;
-  confidence: number; // 0-1, how confident we are this is the right person
+  confidence: number;
+  structuredData?: Record<string, unknown>;
 }
 
 export interface DigitalFootprint {
@@ -66,4 +77,90 @@ export interface ScrapeResponse {
   footprint: DigitalFootprint | null;
   errors: ScrapeError[];
   status: "complete" | "partial" | "failed";
+}
+
+/* ─── Async job types ──────────────────────────────────────────────────────── */
+
+export type JobStatus = "pending" | "running" | "complete" | "partial" | "failed";
+
+export interface ScrapeJobStartResponse {
+  jobId: string;
+  status: "pending";
+}
+
+export interface ScrapeJobStatusResponse {
+  jobId: string;
+  status: JobStatus;
+  progress: Record<string, "pending" | "running" | "done" | "no_result" | "error">;
+  resultsCount: number;
+  errorCount: number;
+}
+
+/* ─── Unified enriched profile ─────────────────────────────────────────────── */
+
+export interface SkillWeight {
+  name: string;
+  weight: number;
+  sources: string[];
+}
+
+export interface WorkExperience {
+  company: string;
+  role: string;
+  start?: string;
+  end?: string;
+  description?: string;
+  sources: string[];
+}
+
+export interface EducationEntry {
+  institution: string;
+  degree?: string;
+  field?: string;
+  years?: string;
+  gpa?: string;
+  sources: string[];
+}
+
+export interface UnifiedProfile {
+  name?: string;
+  headline?: string;
+  location?: string;
+  bio?: string;
+  skills: SkillWeight[];
+  workExperience: WorkExperience[];
+  education: EducationEntry[];
+  publications: Record<string, unknown>[];
+  patents: Record<string, unknown>[];
+  projects: Record<string, unknown>[];
+  socialConnections: string[];
+  locationHistory: string[];
+  interests: string[];
+  awards: string[];
+  socialHandles: Record<string, string>;
+  urls: string[];
+  dataQuality: number;
+}
+
+export interface EnrichResponse {
+  profile: UnifiedProfile;
+  processingTimeMs: number;
+  sourcesUsed: number;
+}
+
+/* ─── Identity resolution ──────────────────────────────────────────────────── */
+
+export interface IdentityCandidate {
+  platform: Platform;
+  url: string;
+  title: string;
+  snippet: string;
+  confidence: number;
+  reasoning: string;
+}
+
+export interface ResolveIdentityResponse {
+  matched: IdentityCandidate[];
+  rejected: IdentityCandidate[];
+  processingTimeMs: number;
 }

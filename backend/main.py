@@ -15,17 +15,31 @@ from pydantic_settings import BaseSettings
 from models.schemas import (
     ScrapeRequest,
     ScrapeResponse,
+    ScrapeJobStartResponse,
+    ScrapeJobStatusRequest,
+    ScrapeJobStatusResponse,
     AnalyzeRequest,
     AnalyzeResponse,
     SimulateRequest,
     SimulateResponse,
     ExtendRequest,
     ExtendResponse,
+    EnrichRequest,
+    EnrichResponse,
+    ResolveIdentityRequest,
+    ResolveIdentityResponse,
     HealthResponse,
 )
-from agents.scraper import run_scraper
+from agents.scraper import (
+    run_scraper,
+    start_scrape_job,
+    get_job_status,
+    get_job_results,
+)
 from agents.analyzer import analyze_profile
 from agents.simulator import run_simulation, run_extend
+from agents.enricher import enrich_profile
+from agents.identity_resolver import resolve_identity
 
 
 # ─── Settings ────────────────────────────────────────────────────────────────
@@ -55,7 +69,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Delphi Oracle API",
     description="Agentic AI future simulation backend",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -86,31 +100,133 @@ async def health():
     """Health check endpoint."""
     return HealthResponse(
         status="ok",
-        version="0.1.0",
+        version="0.2.0",
         services={
             "scraper": True,
             "analyzer": True,
             "simulator": True,
+            "enricher": True,
+            "identity_resolver": True,
         },
     )
 
 
+# ─── Scraping ─────────────────────────────────────────────────────────────────
+
 @app.post(
     "/scrape",
-    response_model=ScrapeResponse,
+    response_model=ScrapeJobStartResponse,
     tags=["Scraping"],
-    summary="Scrape a person's digital footprint",
+    summary="Start an async scrape job",
 )
 async def scrape(
     request: ScrapeRequest,
     _: str = Depends(verify_api_key),
-) -> ScrapeResponse:
-    """Scrape public web sources for a person's digital footprint."""
+) -> ScrapeJobStartResponse:
+    """Start a background scrape job across all platforms. Returns a job_id to poll."""
     try:
-        return await run_scraper(request)
+        return await start_scrape_job(request)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+
+@app.post(
+    "/scrape/status",
+    response_model=ScrapeJobStatusResponse,
+    tags=["Scraping"],
+    summary="Check scrape job progress",
+)
+async def scrape_status(
+    request: ScrapeJobStatusRequest,
+    _: str = Depends(verify_api_key),
+) -> ScrapeJobStatusResponse:
+    """Poll the status and per-platform progress of a scrape job."""
+    status = get_job_status(request.job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail=f"Job {request.job_id!r} not found")
+    return status
+
+
+@app.get(
+    "/scrape/results/{job_id}",
+    response_model=ScrapeResponse,
+    tags=["Scraping"],
+    summary="Get completed scrape results",
+)
+async def scrape_results(
+    job_id: str,
+    _: str = Depends(verify_api_key),
+) -> ScrapeResponse:
+    """Get the full results of a completed scrape job."""
+    status = get_job_status(job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+    if status.status in ("pending", "running"):
+        raise HTTPException(
+            status_code=202,
+            detail=f"Job is still {status.status}. Poll /scrape/status first.",
+        )
+    results = get_job_results(job_id)
+    if results is None:
+        raise HTTPException(status_code=404, detail="Results not available")
+    return results
+
+
+# ─── Enrichment ───────────────────────────────────────────────────────────────
+
+@app.post(
+    "/enrich",
+    response_model=EnrichResponse,
+    tags=["Enrichment"],
+    summary="Build unified profile from raw scrape results",
+)
+async def enrich(
+    request: EnrichRequest,
+    _: str = Depends(verify_api_key),
+) -> EnrichResponse:
+    """Use Claude to deduplicate and synthesize a unified profile from scraped data."""
+    if not request.api_key:
+        claude_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not claude_key:
+            raise HTTPException(
+                status_code=503,
+                detail="ANTHROPIC_API_KEY not configured",
+            )
+        request = request.model_copy(update={"api_key": claude_key})
+    try:
+        return await enrich_profile(request)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ─── Identity resolution ──────────────────────────────────────────────────────
+
+@app.post(
+    "/resolve-identity",
+    response_model=ResolveIdentityResponse,
+    tags=["Identity"],
+    summary="Verify if scraped profiles match the target person",
+)
+async def resolve_identity_endpoint(
+    request: ResolveIdentityRequest,
+    _: str = Depends(verify_api_key),
+) -> ResolveIdentityResponse:
+    """Use Claude to score each scraped profile's likelihood of matching the target person."""
+    if not request.api_key:
+        claude_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not claude_key:
+            raise HTTPException(
+                status_code=503,
+                detail="ANTHROPIC_API_KEY not configured",
+            )
+        request = request.model_copy(update={"api_key": claude_key})
+    try:
+        return await resolve_identity(request)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ─── Analysis ─────────────────────────────────────────────────────────────────
 
 @app.post(
     "/analyze",
@@ -123,7 +239,6 @@ async def analyze(
     api_key: str = Depends(verify_api_key),
 ) -> AnalyzeResponse:
     """Use LLM to extract a structured profile from raw scraped data."""
-    # Use the backend's own API key for analysis if available
     claude_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not claude_key:
         raise HTTPException(
@@ -135,6 +250,8 @@ async def analyze(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+
+# ─── Simulation ───────────────────────────────────────────────────────────────
 
 @app.post(
     "/simulate",
