@@ -1,0 +1,365 @@
+@import "tailwindcss";
+
+/* ─── Geist font faces ─────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+}
+
+/* ─── Design tokens (Tailwind v4 CSS-first theme) ──────────────────────────── */
+@theme {
+  /* Fonts */
+  --font-sans: var(--font-geist-sans), "Geist Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "Fira Code", monospace;
+
+  /* ── Cosmic color palette (OKLCH) ─── */
+
+  /* Deep navy backgrounds */
+  --color-void-950:  oklch(8%  0.030 270);
+  --color-void-900:  oklch(11% 0.035 268);
+  --color-void-800:  oklch(15% 0.042 265);
+  --color-void-700:  oklch(19% 0.048 263);
+  --color-void-600:  oklch(24% 0.052 260);
+  --color-void-500:  oklch(30% 0.055 258);
+  --color-void-400:  oklch(38% 0.052 260);
+  --color-void-300:  oklch(50% 0.045 262);
+  --color-void-200:  oklch(65% 0.035 264);
+  --color-void-100:  oklch(80% 0.020 265);
+
+  /* Nebula purples */
+  --color-nebula-950: oklch(10% 0.060 290);
+  --color-nebula-900: oklch(14% 0.075 288);
+  --color-nebula-800: oklch(18% 0.090 286);
+  --color-nebula-700: oklch(24% 0.100 284);
+  --color-nebula-600: oklch(32% 0.105 282);
+  --color-nebula-500: oklch(45% 0.120 280);
+  --color-nebula-400: oklch(58% 0.130 278);
+  --color-nebula-300: oklch(68% 0.115 276);
+  --color-nebula-200: oklch(78% 0.090 274);
+  --color-nebula-100: oklch(90% 0.050 272);
+
+  /* Oracle gold / amber */
+  --color-oracle-950: oklch(18% 0.060 60);
+  --color-oracle-900: oklch(25% 0.080 62);
+  --color-oracle-800: oklch(34% 0.110 65);
+  --color-oracle-700: oklch(46% 0.145 68);
+  --color-oracle-600: oklch(58% 0.165 72);
+  --color-oracle-500: oklch(72% 0.175 76);
+  --color-oracle-400: oklch(82% 0.165 80);
+  --color-oracle-300: oklch(88% 0.140 84);
+  --color-oracle-200: oklch(93% 0.100 86);
+  --color-oracle-100: oklch(97% 0.050 88);
+
+  /* Probability teal (high confidence) */
+  --color-signal-700: oklch(30% 0.090 185);
+  --color-signal-600: oklch(42% 0.110 185);
+  --color-signal-500: oklch(56% 0.130 185);
+  --color-signal-400: oklch(68% 0.120 185);
+  --color-signal-300: oklch(78% 0.100 185);
+
+  /* Danger red (low probability) */
+  --color-hazard-700: oklch(28% 0.100 25);
+  --color-hazard-600: oklch(40% 0.130 20);
+  --color-hazard-500: oklch(55% 0.160 22);
+  --color-hazard-400: oklch(65% 0.150 24);
+
+  /* Text */
+  --color-text-primary:   oklch(96% 0.008 270);
+  --color-text-secondary: oklch(68% 0.025 265);
+  --color-text-muted:     oklch(48% 0.020 265);
+  --color-text-ghost:     oklch(35% 0.015 265);
+
+  /* Borders */
+  --color-border-bright:  oklch(32% 0.060 268);
+  --color-border:         oklch(22% 0.045 268);
+  --color-border-subtle:  oklch(16% 0.035 268);
+
+  /* Glow / FX */
+  --color-glow-gold:    oklch(78% 0.175 76 / 0.4);
+  --color-glow-nebula:  oklch(55% 0.130 280 / 0.4);
+  --color-glow-signal:  oklch(60% 0.130 185 / 0.35);
+
+  /* ── Spacing ─── */
+  --spacing-18: 4.5rem;
+  --spacing-22: 5.5rem;
+  --spacing-26: 6.5rem;
+  --spacing-30: 7.5rem;
+  --spacing-34: 8.5rem;
+
+  /* ── Border radius ─── */
+  --radius-xs:   2px;
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  20px;
+  --radius-3xl:  28px;
+
+  /* ── Animations ─── */
+  --animate-spin-slow:    spin 8s linear infinite;
+  --animate-pulse-slow:   pulse 4s cubic-bezier(0.4,0,0.6,1) infinite;
+  --animate-drift:        drift 20s ease-in-out infinite;
+  --animate-shimmer:      shimmer 2.5s ease-in-out infinite;
+  --animate-glow-pulse:   glow-pulse 3s ease-in-out infinite;
+  --animate-float:        float 6s ease-in-out infinite;
+}
+
+/* ─── Keyframes ─────────────────────────────────────────────────────────────── */
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0); }
+  25%       { transform: translate(8px, -12px); }
+  50%       { transform: translate(-6px, 8px); }
+  75%       { transform: translate(10px, 4px); }
+}
+
+@keyframes shimmer {
+  0%    { background-position: -200% center; }
+  100%  { background-position: 200% center; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; filter: blur(20px); }
+  50%       { opacity: 1;   filter: blur(28px); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Base styles ───────────────────────────────────────────────────────────── */
+html {
+  font-family: var(--font-sans);
+  background-color: oklch(8% 0.030 270);
+  color: oklch(96% 0.008 270);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background-color: oklch(8% 0.030 270);
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: oklch(11% 0.035 268);
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(30% 0.055 258);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(38% 0.052 260);
+}
+
+/* ─── Selection ─────────────────────────────────────────────────────────────── */
+::selection {
+  background: oklch(55% 0.130 280 / 0.4);
+  color: oklch(96% 0.008 270);
+}
+
+/* ─── Focus ring ────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid oklch(72% 0.175 76);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Utility classes ───────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Glass morphism */
+  .glass {
+    background: oklch(18% 0.042 265 / 0.6);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid oklch(30% 0.055 258 / 0.4);
+  }
+
+  .glass-dark {
+    background: oklch(11% 0.035 268 / 0.8);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    border: 1px solid oklch(22% 0.045 268 / 0.6);
+  }
+
+  .glass-card {
+    background: oklch(15% 0.042 265 / 0.7);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border: 1px solid oklch(28% 0.055 265 / 0.35);
+    box-shadow:
+      0 0 0 1px oklch(100% 0 0 / 0.03),
+      0 4px 6px oklch(0% 0 0 / 0.3),
+      0 12px 32px oklch(0% 0 0 / 0.25),
+      inset 0 1px 0 oklch(100% 0 0 / 0.06);
+  }
+
+  /* Gradient text */
+  .text-gradient-gold {
+    background: linear-gradient(135deg, oklch(88% 0.140 84), oklch(72% 0.175 76), oklch(58% 0.165 72));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .text-gradient-nebula {
+    background: linear-gradient(135deg, oklch(90% 0.050 272), oklch(68% 0.115 276), oklch(45% 0.120 280));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .text-gradient-cosmic {
+    background: linear-gradient(135deg,
+      oklch(88% 0.140 84) 0%,
+      oklch(78% 0.090 274) 50%,
+      oklch(68% 0.115 276) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Shimmer animation */
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      oklch(72% 0.175 76) 0%,
+      oklch(88% 0.140 84) 30%,
+      oklch(68% 0.115 276) 50%,
+      oklch(88% 0.140 84) 70%,
+      oklch(72% 0.175 76) 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  /* Glow effects */
+  .glow-gold {
+    box-shadow: 0 0 24px oklch(72% 0.175 76 / 0.3), 0 0 48px oklch(72% 0.175 76 / 0.15);
+  }
+
+  .glow-nebula {
+    box-shadow: 0 0 24px oklch(55% 0.130 280 / 0.4), 0 0 48px oklch(55% 0.130 280 / 0.2);
+  }
+
+  .glow-signal {
+    box-shadow: 0 0 20px oklch(60% 0.130 185 / 0.3), 0 0 40px oklch(60% 0.130 185 / 0.15);
+  }
+
+  /* Animated border */
+  .border-shimmer {
+    position: relative;
+  }
+  .border-shimmer::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      oklch(72% 0.175 76 / 0.8),
+      oklch(55% 0.130 280 / 0.4),
+      oklch(72% 0.175 76 / 0.1),
+      oklch(55% 0.130 280 / 0.4)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Animation utilities */
+  .animate-reveal-up {
+    animation: reveal-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+}
+
+/* ─── React Flow overrides ──────────────────────────────────────────────────── */
+.react-flow__background {
+  background-color: transparent !important;
+}
+
+.react-flow__background pattern {
+  color: oklch(28% 0.048 263 / 0.5);
+}
+
+.react-flow__controls {
+  background: oklch(15% 0.042 265 / 0.8) !important;
+  border: 1px solid oklch(28% 0.055 265 / 0.4) !important;
+  border-radius: 10px !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid oklch(28% 0.055 265 / 0.3) !important;
+  color: oklch(68% 0.025 265) !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 6px !important;
+  transition: all 0.15s ease !important;
+}
+
+.react-flow__controls-button:hover {
+  background: oklch(24% 0.052 260 / 0.6) !important;
+  color: oklch(82% 0.165 80) !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.react-flow__attribution {
+  display: none !important;
+}
+
+/* ─── Prose overrides for content areas ─────────────────────────────────────── */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: oklch(19% 0.048 263);
+  border: 1px solid oklch(28% 0.055 265 / 0.5);
+  padding: 0.125em 0.375em;
+  border-radius: 4px;
+  color: oklch(82% 0.165 80);
+}
