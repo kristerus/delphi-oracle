@@ -36,12 +36,6 @@
       ]
     }
   ],
-  "rewrites": [
-    {
-      "source": "/api/python/:path*",
-      "destination": "https://delphi-oracle-api.vercel.app/api/:path*"
-    }
-  ],
   "redirects": [
     {
       "source": "/home",

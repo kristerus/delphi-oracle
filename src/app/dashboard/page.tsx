@@ -20,6 +20,7 @@ import {
   User,
   Pencil,
   Trash2,
+  Search,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/layout/Navbar";
@@ -254,6 +255,25 @@ const DEMO_SIMULATIONS: SimulationMeta[] = [
   },
 ];
 
+const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  openai: [
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o Mini (faster)" },
+    { value: "o1-mini", label: "o1-mini" },
+  ],
+  anthropic: [
+    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+    { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku (faster)" },
+    { value: "claude-3-opus-20240229", label: "Claude 3 Opus" },
+  ],
+  claude: [
+    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+    { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku (faster)" },
+    { value: "claude-3-opus-20240229", label: "Claude 3 Opus" },
+  ],
+  custom: [],
+};
+
 /* ── New Simulation Modal ── */
 function NewSimulationModal({
   onClose,
@@ -262,7 +282,7 @@ function NewSimulationModal({
   savedProvider: initialSavedProvider = "claude",
 }: {
   onClose: () => void;
-  onSimulate: (title: string, apiKey: string, provider: string, categories: SimulationCategory[], personalContext?: string) => Promise<void>;
+  onSimulate: (title: string, apiKey: string, provider: string, categories: SimulationCategory[], personalContext?: string, model?: string) => Promise<void>;
   hasSavedKeys?: boolean;
   savedProvider?: "claude" | "openai" | "custom";
 }) {
@@ -270,7 +290,8 @@ function NewSimulationModal({
   const [title, setTitle] = useState("");
   const [personalContext, setPersonalContext] = useState("");
   const [apiKey, setApiKey] = useState(hasSavedKeys ? "__profile__" : "");
-  const [provider, setProvider] = useState(hasSavedKeys ? initialSavedProvider : "claude");
+  const [provider, setProvider] = useState<"claude" | "openai" | "custom">(hasSavedKeys ? initialSavedProvider : "claude");
+  const [model, setModel] = useState("claude-3-5-sonnet-20241022");
   const [useSavedKey, setUseSavedKey] = useState(hasSavedKeys);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -299,7 +320,7 @@ function NewSimulationModal({
     setGenerating(true);
     setError(null);
     try {
-      await onSimulate(title.trim(), effectiveApiKey.trim(), provider, categories, personalContext.trim() || undefined);
+      await onSimulate(title.trim(), effectiveApiKey.trim(), provider, categories, personalContext.trim() || undefined, model || undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Simulation failed");
@@ -463,24 +484,42 @@ function NewSimulationModal({
               Your saved {initialSavedProvider} key from Profile will be used automatically.
             </p>
           ) : (
-            <div className="flex gap-2">
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as "claude" | "openai" | "custom")}
-                className="bg-void-800/60 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-oracle-700 transition-colors"
-              >
-                <option value="claude">Claude</option>
-                <option value="openai">OpenAI</option>
-                <option value="custom">Custom</option>
-              </select>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-ant-api03-…"
-                className="flex-1 bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 font-mono"
-              />
-            </div>
+            <>
+              <div className="flex gap-2">
+                <select
+                  value={provider}
+                  onChange={(e) => {
+                    const p = e.target.value as "claude" | "openai" | "custom";
+                    setProvider(p);
+                    const opts = MODEL_OPTIONS[p];
+                    setModel(opts && opts.length > 0 ? opts[0].value : "");
+                  }}
+                  className="bg-void-800/60 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-oracle-700 transition-colors"
+                >
+                  <option value="claude">Claude</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="custom">Custom</option>
+                </select>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="sk-ant-api03-…"
+                  className="flex-1 bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 font-mono"
+                />
+              </div>
+              {MODEL_OPTIONS[provider] && MODEL_OPTIONS[provider].length > 0 && (
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="w-full bg-void-800/60 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-oracle-700 transition-colors"
+                >
+                  {MODEL_OPTIONS[provider].map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              )}
+            </>
           )}
           <p className="text-xs text-text-ghost">
             Save your key in{" "}
@@ -529,6 +568,7 @@ export default function DashboardPage() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Client-side auth guard
   useEffect(() => {
@@ -613,7 +653,7 @@ export default function DashboardPage() {
   }, []);
 
   const handleSimulate = useCallback(
-    async (title: string, apiKey: string, provider: string, categories: SimulationCategory[] = ["career"], personalContext?: string) => {
+    async (title: string, apiKey: string, provider: string, categories: SimulationCategory[] = ["career"], personalContext?: string, model?: string) => {
       setLastApiKey(apiKey);
       setLastProvider(provider as "claude" | "openai" | "custom");
 
@@ -631,6 +671,7 @@ export default function DashboardPage() {
         profile,
         apiKey,
         provider: provider as "claude" | "openai" | "custom",
+        model,
         categories,
       });
 
@@ -719,6 +760,9 @@ export default function DashboardPage() {
   const selectedNode = selectedNodeId
     ? activeTree?.nodes.find((n) => n.id === selectedNodeId)
     : null;
+  const filteredSimulations = simulations.filter((sim) =>
+    sim.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="h-screen bg-void-950 flex flex-col overflow-hidden">
@@ -739,10 +783,20 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-1">
+            <div className="relative mb-3">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-[oklch(0.5_0.05_280)]" />
+              <input
+                type="text"
+                placeholder="Search simulations..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-xs bg-[oklch(0.12_0.03_280)] border border-[oklch(0.2_0.05_280)] rounded-lg text-[oklch(0.9_0.05_280)] placeholder:text-[oklch(0.4_0.05_280)] focus:outline-none focus:border-[oklch(0.75_0.18_85)] transition-colors"
+              />
+            </div>
             <p className="text-xs font-medium text-text-ghost uppercase tracking-wider px-2 py-1.5">
               Recent simulations
             </p>
-            {simulations.map((sim) => {
+            {filteredSimulations.map((sim) => {
               const cats = (sim.categories ?? ["career"]) as SimulationCategory[];
               const isCombo = cats.length > 1;
               return (
@@ -849,7 +903,7 @@ export default function DashboardPage() {
             })}
 
             {/* Empty state hint for new users */}
-            {simulations.every((s) => s.id.startsWith("demo-")) && (
+            {filteredSimulations.every((s) => s.id.startsWith("demo-")) && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}

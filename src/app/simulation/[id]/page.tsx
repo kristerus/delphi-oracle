@@ -37,6 +37,7 @@ import CertaintyIndicator from "@/components/timeline/CertaintyIndicator";
 import DepthControls from "@/components/timeline/DepthControls";
 import { DEMO_SIMULATION } from "@/lib/ai/types";
 import type { FutureTreeNode, FutureTreeEdge, FutureNodeData, Granularity } from "@/lib/ai/types";
+import { authClient } from "@/lib/auth-client";
 
 const nodeTypes = { futureNode: FutureNode } as const;
 const edgeTypes = { branchEdge: BranchEdge } as const;
@@ -274,15 +275,29 @@ function ShortcutsHint() {
   );
 }
 
+/* ─── Guest banner ────────────────────────────────────────────────────────── */
+function GuestBanner() {
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50 bg-[oklch(0.2_0.05_280)] border-b border-[oklch(0.3_0.05_280)] px-4 py-2 flex items-center justify-between text-sm">
+      <span className="text-[oklch(0.8_0.05_280)]">You&apos;re viewing a shared simulation</span>
+      <a href="/sign-in" className="bg-[oklch(0.75_0.18_85)] text-[oklch(0.1_0.02_280)] px-3 py-1 rounded font-semibold hover:opacity-90 transition-opacity">
+        Sign in to explore
+      </a>
+    </div>
+  );
+}
+
 /* ─── Node detail panel ───────────────────────────────────────────────────── */
 function NodePanel({
   node,
   onClose,
   onExtend,
+  isGuest,
 }: {
   node: FutureTreeNode;
   onClose: () => void;
   onExtend: (nodeId: string, depth?: number, granularity?: Granularity) => Promise<void>;
+  isGuest?: boolean;
 }) {
   const d = node.data;
   const probPct = Math.round((d.probability ?? 0) * 100);
@@ -386,7 +401,7 @@ function NodePanel({
           </div>
         )}
 
-        {!d.isRoot && (
+        {!d.isRoot && !isGuest && (
           <button
             onClick={() => onExtend(node.id)}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 hover:text-oracle-300 font-medium text-sm transition-all duration-200"
@@ -476,6 +491,10 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
 
   const isDemo = id.startsWith("demo-");
+
+  // ── Auth state ──
+  const { data: session, isPending: sessionLoading } = authClient.useSession();
+  const isGuest = !sessionLoading && !session;
 
   // ── Tree state ──
   const [nodes, setNodes] = useState<FutureTreeNode[]>([]);
@@ -648,8 +667,11 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
   /* ── Render ── */
   return (
     <div className="h-screen bg-void-950 flex flex-col overflow-hidden">
+      {/* Guest banner */}
+      {isGuest && <GuestBanner />}
+
       {/* Header */}
-      <header className="shrink-0 border-b border-border-subtle bg-void-950/90 backdrop-blur-xl z-30">
+      <header className={`shrink-0 border-b border-border-subtle bg-void-950/90 backdrop-blur-xl z-30${isGuest ? " mt-10" : ""}`}>
         <div className="flex items-center gap-3 px-4 py-2.5">
           <Link
             href="/dashboard"
@@ -674,7 +696,7 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
           <div className="flex-1" />
 
           <div className="flex items-center gap-2 shrink-0">
-            <ApiKeyPopover apiKey={apiKey} provider={provider} onSave={saveApiKey} />
+            {!isGuest && <ApiKeyPopover apiKey={apiKey} provider={provider} onSave={saveApiKey} />}
             <ShortcutsHint />
 
             <button
@@ -706,7 +728,7 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
           onExtendAll={handleExtendAll}
           onCertaintyFilter={setCertaintyThreshold}
           certaintyThreshold={certaintyThreshold}
-          disabled={isDemo || !apiKey}
+          disabled={isGuest || isDemo || !apiKey}
         />
       </div>
 
@@ -773,6 +795,7 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
               node={selectedNode}
               onClose={() => setSelectedNodeId(null)}
               onExtend={handleExtend}
+              isGuest={isGuest}
             />
           )}
         </AnimatePresence>

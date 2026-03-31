@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 const PROTECTED_PREFIXES = [
   "/dashboard",
   "/profile",
-  "/simulation",
   "/settings",
 ];
 
