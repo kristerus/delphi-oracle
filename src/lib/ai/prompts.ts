@@ -1,31 +1,33 @@
 import type { UserProfile, SimulationCategory } from "./types";
 
 export function buildSimulationSystemPrompt(): string {
-  return `You are the Delphi Oracle — an AI future simulator that generates probability-weighted branching life timelines.
+  return `You are the Delphi Oracle — an AI future simulator that generates probability-weighted branching life timelines grounded in verifiable reality.
 
-Your role is to analyze a person's current situation and a life decision they're considering, then generate realistic, specific, and thoughtful branching futures.
+Your role is to analyze a person's current situation and a life decision they're considering, then generate realistic branching futures that reference REAL, SPECIFIC entities.
 
 CRITICAL RULES:
-1. Base predictions on the user's actual profile data — skills, experience, location, education
-2. Probabilities must be realistic, not optimistic — account for base rates and market conditions
-3. Each branch must be meaningfully different, not just variations of the same outcome
-4. Details should be specific, not generic platitudes
-5. Consider second-order effects and non-obvious consequences
-6. Timeframes must be grounded in reality
+1. EVERY prediction must reference REAL, NAMED entities: actual companies (e.g. "Anthropic", "Stripe"), real people (e.g. "Professor Yann LeCun at NYU"), real programs (e.g. "Stanford CS PhD"), real salary ranges from current market data
+2. Base predictions on the user's actual profile — their specific skills, experience level, location, and education determine which opportunities are realistically accessible to them
+3. Probabilities must reflect real base rates: startup success (~10%), PhD completion (~50-70%), job offer rates, promotion timelines at specific companies
+4. Each branch must be meaningfully different — not variations of the same outcome
+5. Key events must be concrete and actionable: "Apply to Y Combinator W2026 batch" not "start a company"
+6. Financial details must be specific: "$180-220K base + $50-80K RSU/yr at Series B" not "good salary"
+7. Name specific technologies, frameworks, papers, courses, certifications relevant to this person's path
+8. Consider second-order effects: how does this choice affect their relationships, health, financial runway, visa status, etc.
 
 OUTPUT FORMAT (strict JSON):
 {
   "branches": [
     {
       "title": "Short, evocative title (max 8 words)",
-      "description": "2-3 sentences describing this branch, specific to the user's profile",
+      "description": "2-3 sentences with SPECIFIC named entities (companies, people, programs, dollar amounts)",
       "probability": 0.00 to 1.00 (all branches must sum to ~1.0),
       "timeframe": "e.g. '6-12 months' or '2-4 years'",
       "details": {
-        "pros": ["array of 2-4 specific upsides"],
-        "cons": ["array of 2-4 specific risks/downsides"],
-        "keyEvents": ["3-5 concrete milestones or decision points"],
-        "skillsNeeded": ["skills this person needs to develop", "given their gap"]
+        "pros": ["array of 2-4 SPECIFIC upsides with real numbers/entities"],
+        "cons": ["array of 2-4 SPECIFIC risks with real consequences"],
+        "keyEvents": ["3-5 CONCRETE milestones with real names, dates, amounts"],
+        "skillsNeeded": ["specific skills with real courses/certs to get them"]
       }
     }
   ]
@@ -35,9 +37,10 @@ OUTPUT FORMAT (strict JSON):
 export function buildSimulationUserPrompt(
   decision: string,
   profile: UserProfile,
-  branchCount: number = 3
+  branchCount: number = 3,
+  groundingContext: string = ""
 ): string {
-  return `Generate ${branchCount} realistic future branches for this person:
+  return `Generate ${branchCount} realistic future branches for this person. Every branch MUST reference real, named companies, people, programs, or institutions — not hypothetical ones.
 
 DECISION: "${decision}"
 
@@ -58,8 +61,17 @@ PROFILE:
 - Bio: ${profile.bio ?? "Not provided"}
 - Risk tolerance: ${profile.riskTolerance ?? "medium"}
 - Time horizon: ${profile.timeHorizon ?? "3 years"}
+${groundingContext}
 
-Return exactly ${branchCount} branches as valid JSON matching the schema above. Be specific to this person's actual situation.`;
+SPECIFICITY REQUIREMENTS:
+- Name REAL companies this person could realistically work at given their profile (e.g. "Figma", "Vercel", "OpenAI" — not "a tech startup")
+- Name REAL salary ranges for their experience level in their location
+- Name REAL programs, courses, or certifications (e.g. "Georgia Tech OMSCS", "fast.ai Practical Deep Learning")
+- Name REAL people they might work with/for if relevant (professors, known founders, etc.)
+- Reference REAL market conditions and industry trends
+- Key events should be actionable steps with specific names and deadlines
+
+Return exactly ${branchCount} branches as valid JSON matching the schema above.`;
 }
 
 export function buildExtendPrompt(
@@ -67,19 +79,29 @@ export function buildExtendPrompt(
   nodeDescription: string,
   parentChainTitles: string[],
   profile: UserProfile,
-  branchCount: number = 3
+  branchCount: number = 3,
+  groundingContext: string = ""
 ): string {
   const chain = parentChainTitles.join(" → ");
-  return `Extend this specific future branch by generating ${branchCount} deeper sub-branches.
+  return `Extend this specific future branch by generating ${branchCount} deeper sub-branches. Each sub-branch MUST reference real, named entities — not hypothetical ones.
 
 BRANCH CHAIN: ${chain} → ${nodeTitle}
 
 CURRENT BRANCH: "${nodeTitle}"
 ${nodeDescription}
 
-PERSON'S PROFILE: ${profile.name}, ${profile.skills.slice(0, 5).join(", ")}
+PERSON'S PROFILE:
+- Name: ${profile.name}
+- Location: ${profile.location ?? "Not specified"}
+- Skills: ${profile.skills.slice(0, 8).join(", ")}
+- Experience: ${profile.experience.map((e) => `${e.title} at ${e.company}`).join("; ") || "Not specified"}
+${groundingContext}
 
-Generate ${branchCount} specific outcomes that could emerge FROM THIS SPECIFIC BRANCH, considering the full chain of events that led here. Each sub-branch should reflect what realistically happens next in this particular timeline.
+Generate ${branchCount} specific outcomes that could emerge FROM THIS SPECIFIC BRANCH. Each must:
+- Name REAL companies, people, programs, salary ranges, or institutions
+- Be causally connected to the branch chain above
+- Include concrete, actionable key events with specific names and dates
+- Reflect realistic probabilities given this person's actual profile
 
 Return valid JSON matching the branches schema.`;
 }
@@ -92,16 +114,17 @@ export function buildDeepContextPrompt(
   targetNodeDescription: string,
   granularity: "month" | "year" | "decade",
   branchCount: number,
-  profile: UserProfile
+  profile: UserProfile,
+  groundingContext: string = ""
 ): string {
   const granularityGuide =
     granularity === "month"
-      ? "Use month-level specificity. Timeframes: '3-6 months', '9-18 months'. Focus on concrete near-term actions and pivots."
+      ? "Use month-level specificity. Timeframes: '3-6 months', '9-18 months'. Name specific companies, job postings, programs, dollar amounts, application deadlines."
       : granularity === "year"
-      ? "Use year-level specificity. Timeframes: '2-4 years', '5-8 years'. Focus on career arcs and structural life changes."
-      : "Use decade-level sweeps. Timeframes: '1-2 decades', '3-5 decades'. Focus on macro life outcomes and legacy.";
+      ? "Use year-level specificity. Timeframes: '2-4 years', '5-8 years'. Name specific career arcs at named companies, wealth targets, life milestone specifics."
+      : "Use decade-level sweeps. Timeframes: '1-2 decades', '3-5 decades'. Project macro trajectories but still reference real industries, institutions, and market forces.";
 
-  return `You are extending a deep prediction chain. The person has traveled through multiple branching futures to arrive at this point. Generate the next ${branchCount} sub-branches that emerge from HERE.
+  return `You are extending a deep prediction chain. The person has traveled through multiple branching futures to arrive at this point. Generate the next ${branchCount} sub-branches.
 
 ANCESTRY CHAIN (full causal history — read carefully):
 ${ancestryContext}
@@ -110,31 +133,37 @@ CURRENT BRANCH (where we are now):
 "${targetNodeTitle}"
 ${targetNodeDescription}
 
-PERSON: ${profile.name}, skills: ${profile.skills.slice(0, 6).join(", ")}
+PERSON:
+- Name: ${profile.name}
+- Location: ${profile.location ?? "Not specified"}
+- Skills: ${profile.skills.slice(0, 8).join(", ")}
+- Experience: ${profile.experience.map((e) => `${e.title} at ${e.company}`).join("; ") || "Not specified"}
+${groundingContext}
 
 GRANULARITY INSTRUCTION:
 ${granularityGuide}
 
-Generate ${branchCount} realistic branches that DIRECTLY follow from this point in the chain. Each must:
-1. Be causally connected to the current branch AND the full ancestry above it
-2. Represent meaningfully different outcomes (not just variations)
-3. Reflect the accumulated consequences of all prior branches
-4. Include a "certainty" score (0.0–1.0) for how confident this prediction is given depth uncertainty
+Generate ${branchCount} branches that DIRECTLY follow from this point. Each must:
+1. Be causally connected to the current branch AND the full ancestry above
+2. Reference REAL, NAMED entities — companies, people, programs, salary ranges
+3. Represent meaningfully different outcomes (not just variations)
+4. Include a "certainty" score (0.0–1.0) reflecting depth uncertainty
+5. Key events must be concrete and actionable with specific names
 
 Return valid JSON:
 {
   "branches": [
     {
       "title": "Short evocative title (max 8 words)",
-      "description": "2-3 sentences specific to this causal chain",
+      "description": "2-3 sentences with SPECIFIC named entities",
       "probability": 0.00-1.00,
       "certainty": 0.00-1.00,
       "timeframe": "e.g. '2-4 years'",
       "details": {
-        "pros": ["2-4 specific upsides"],
-        "cons": ["2-4 specific risks"],
-        "keyEvents": ["3-5 concrete milestones"],
-        "skillsNeeded": ["skills the person needs"]
+        "pros": ["2-4 SPECIFIC upsides with real numbers/entities"],
+        "cons": ["2-4 SPECIFIC risks"],
+        "keyEvents": ["3-5 concrete milestones with real names"],
+        "skillsNeeded": ["specific skills with real courses/certs"]
       }
     }
   ]
@@ -346,11 +375,12 @@ export function buildCombinedUserPrompt(
   categories: SimulationCategory[],
   decision: string,
   profile: UserProfile,
-  branchCount: number
+  branchCount: number,
+  groundingContext: string = ""
 ): string {
   if (categories.length === 1) {
     if (categories[0] === "romantic") return buildRomanticUserPrompt(decision, profile, branchCount);
-    return buildSimulationUserPrompt(decision, profile, branchCount);
+    return buildSimulationUserPrompt(decision, profile, branchCount, groundingContext);
   }
 
   const domainList = categories.map((c) => CATEGORY_LABELS[c]).join(" × ");
@@ -372,7 +402,12 @@ PROFILE:
 - Bio: ${profile.bio ?? "Not provided"}
 - Risk tolerance: ${profile.riskTolerance ?? "medium"}
 
-Generate exactly ${branchCount} branches where ${domainList} genuinely interweave. Each branch should show a DIFFERENT way these life areas interact — some in synergy, some in conflict, some in unexpected ways. Make the cross-domain dynamics the core of each prediction.
+${groundingContext}
+
+Generate exactly ${branchCount} branches where ${domainList} genuinely interweave. Each branch must:
+- Reference REAL, NAMED entities (companies, programs, people, salary ranges)
+- Show a DIFFERENT way these life areas interact — synergy, conflict, or unexpected consequences
+- Include specific, actionable key events with real names and dates
 
 Return valid JSON matching the schema above.`;
 }

@@ -16,7 +16,7 @@ import {
   findLeafNodes,
 } from "@/lib/ai/deep-extend";
 import type { AIClientConfig, UserProfile, Granularity } from "@/lib/ai/types";
-import { nanoid } from "nanoid";
+import crypto from "crypto";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeProfile } from "@/lib/sanitize";
 import { logger, toUserError } from "@/lib/logger";
@@ -101,7 +101,7 @@ async function insertBranches(
 
   for (let i = 0; i < branches.length; i++) {
     const branch = branches[i];
-    const nodeId = nanoid();
+    const nodeId = crypto.randomUUID();
     const yOffset = parentY + (i - (nodeCount - 1) / 2) * 220;
     const posX = parentX + 440;
 

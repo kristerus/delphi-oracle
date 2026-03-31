@@ -6,8 +6,9 @@ import { simulations, futureNodes, apiKeys } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { callAI, parseAIJson } from "@/lib/ai/client";
 import { buildCombinedSystemPrompt, buildCombinedUserPrompt } from "@/lib/ai/prompts";
+import { gatherGroundingContext, formatGroundingForPrompt } from "@/lib/ai/grounding";
 import type { AIClientConfig, UserProfile, SimulationTree, SimulationCategory } from "@/lib/ai/types";
-import { nanoid } from "nanoid";
+import crypto from "crypto";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeUserText, sanitizeProfile } from "@/lib/sanitize";
 import { logger, toUserError } from "@/lib/logger";
@@ -115,6 +116,18 @@ export async function POST(req: NextRequest) {
       Array.isArray(body.categories) && body.categories.length > 0
         ? body.categories
         : ["career"];
+
+    // Gather real-world context via web search (best-effort, non-blocking on failure)
+    logger.info("Gathering grounding context", { userId: session.user.id });
+    const groundingCtx = await gatherGroundingContext(
+      cleanDecision,
+      cleanProfile,
+      categories,
+      resolvedApiKey,
+      resolvedProvider
+    );
+    const groundingStr = formatGroundingForPrompt(groundingCtx);
+
     const messages = [
       { role: "system" as const, content: buildCombinedSystemPrompt(categories) },
       {
@@ -123,7 +136,8 @@ export async function POST(req: NextRequest) {
           categories,
           cleanDecision,
           cleanProfile,
-          body.branchCount ?? 3
+          body.branchCount ?? 3,
+          groundingStr
         ),
       },
     ];
@@ -142,8 +156,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Persist simulation to DB
-    const simId = nanoid();
-    const rootId = nanoid();
+    const simId = crypto.randomUUID();
+    const rootId = crypto.randomUUID();
 
     await db.insert(simulations).values({
       id: simId,
@@ -171,7 +185,7 @@ export async function POST(req: NextRequest) {
     const nodeCount = parsed.branches.length;
     const branchNodes = await Promise.all(
       parsed.branches.map(async (branch, i) => {
-        const nodeId = nanoid();
+        const nodeId = crypto.randomUUID();
         const yOffset = (i - (nodeCount - 1) / 2) * 260;
 
         await db.insert(futureNodes).values({

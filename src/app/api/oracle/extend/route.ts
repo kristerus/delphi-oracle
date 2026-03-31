@@ -6,8 +6,9 @@ import { futureNodes, apiKeys } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { callAI, parseAIJson } from "@/lib/ai/client";
 import { buildExtendPrompt, buildSimulationSystemPrompt } from "@/lib/ai/prompts";
+import { gatherGroundingContext, formatGroundingForPrompt } from "@/lib/ai/grounding";
 import type { AIClientConfig, UserProfile } from "@/lib/ai/types";
-import { nanoid } from "nanoid";
+import crypto from "crypto";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeProfile } from "@/lib/sanitize";
 import { logger, toUserError } from "@/lib/logger";
@@ -106,6 +107,16 @@ export async function POST(req: NextRequest) {
       model: body.model,
     };
 
+    // Gather real-world grounding context
+    const groundingCtx = await gatherGroundingContext(
+      targetNode.title,
+      cleanProfile,
+      ["career"],
+      resolvedApiKey,
+      resolvedProvider
+    );
+    const groundingStr = formatGroundingForPrompt(groundingCtx);
+
     const messages = [
       { role: "system" as const, content: buildSimulationSystemPrompt() },
       {
@@ -115,7 +126,8 @@ export async function POST(req: NextRequest) {
           targetNode.description,
           parentChainTitles,
           cleanProfile,
-          body.branchCount ?? 3
+          body.branchCount ?? 3,
+          groundingStr
         ),
       },
     ];
@@ -149,7 +161,7 @@ export async function POST(req: NextRequest) {
 
     const newNodes = await Promise.all(
       parsed.branches.map(async (branch, i) => {
-        const nodeId = nanoid();
+        const nodeId = crypto.randomUUID();
         const yOffset = parentY + (i - (nodeCount - 1) / 2) * 220;
 
         await db.insert(futureNodes).values({
