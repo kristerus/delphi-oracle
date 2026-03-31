@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import {
   ArrowRight,
   Sparkles,
@@ -13,6 +13,7 @@ import {
   Zap,
   Shield,
   Brain,
+  CheckCircle2,
 } from "lucide-react";
 
 /* ─── Constellation Canvas ──────────────────────────────────────────────────── */
@@ -268,6 +269,50 @@ const steps = [
   },
 ];
 
+/* ─── FAQ Item ──────────────────────────────────────────────────────────────── */
+
+function FAQItem({ q, a, index }: { q: string; a: string; index: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay: index * 0.05 }}
+      className="glass-card rounded-xl overflow-hidden"
+    >
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-6 py-4 text-left"
+      >
+        <span className="text-sm font-medium text-text-primary">{q}</span>
+        <motion.span
+          animate={{ rotate: open ? 45 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-text-muted ml-4 shrink-0 text-lg leading-none"
+        >
+          +
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <p className="px-6 pb-5 text-sm text-text-secondary leading-relaxed border-t border-border-subtle pt-3">
+              {a}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 /* ─── Page ──────────────────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
@@ -503,6 +548,158 @@ export default function LandingPage() {
                   <p className="text-text-secondary text-sm leading-relaxed">{step.description}</p>
                 </div>
               </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ── */}
+      <section id="pricing" className="relative z-10 py-28 px-6">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-16"
+          >
+            <p className="text-oracle-500 text-sm font-medium uppercase tracking-widest mb-3">Pricing</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-text-primary tracking-tight">
+              Simple,{" "}
+              <span className="text-gradient-gold">transparent</span>
+            </h2>
+            <p className="text-text-secondary text-lg mt-4 max-w-xl mx-auto">
+              Bring your own AI keys and pay nothing. Or go Pro for the full oracle experience.
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {/* Free */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: 0.05 }}
+              className="glass-card rounded-2xl p-7 flex flex-col"
+            >
+              <div className="mb-5">
+                <p className="text-sm font-medium text-text-muted uppercase tracking-wider mb-1">Free</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-bold text-text-primary">$0</span>
+                  <span className="text-text-muted text-sm">/mo</span>
+                </div>
+              </div>
+              <ul className="space-y-3 flex-1 mb-7">
+                {["Unlimited simulations (BYOK)", "Up to 3 branches per node", "Tree + Timeline views", "Manual profile builder", "Community support"].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-text-secondary">
+                    <CheckCircle2 className="w-4 h-4 text-signal-500 mt-0.5 shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/register" className="w-full text-center py-2.5 rounded-xl border border-border hover:border-border-bright text-text-secondary hover:text-text-primary text-sm font-medium transition-all">
+                Get started free
+              </Link>
+            </motion.div>
+
+            {/* Pro */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: 0.12 }}
+              className="relative glass-card rounded-2xl p-7 flex flex-col border-oracle-700/50"
+              style={{ boxShadow: "0 0 40px oklch(72% 0.175 76 / 0.12)" }}
+            >
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-oracle-500 text-void-950 text-xs font-bold px-3 py-1 rounded-full">
+                Most popular
+              </div>
+              <div className="mb-5">
+                <p className="text-sm font-medium text-oracle-400 uppercase tracking-wider mb-1">Pro</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-bold text-text-primary">$12</span>
+                  <span className="text-text-muted text-sm">/mo</span>
+                </div>
+              </div>
+              <ul className="space-y-3 flex-1 mb-7">
+                {["Everything in Free", "AI-powered digital footprint scraping", "Up to 6 branches per node", "Deep prediction chains (3+ levels)", "Multi-category combination trees", "Priority AI routing", "Email support"].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-text-secondary">
+                    <CheckCircle2 className="w-4 h-4 text-oracle-500 mt-0.5 shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/register" className="w-full text-center py-2.5 rounded-xl bg-oracle-500 hover:bg-oracle-400 text-void-950 text-sm font-semibold transition-all hover:shadow-[0_0_20px_oklch(72%_0.175_76_/_0.5)]">
+                Start free trial
+              </Link>
+            </motion.div>
+
+            {/* Team */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: 0.19 }}
+              className="glass-card rounded-2xl p-7 flex flex-col"
+            >
+              <div className="mb-5">
+                <p className="text-sm font-medium text-nebula-400 uppercase tracking-wider mb-1">Team</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-bold text-text-primary">$39</span>
+                  <span className="text-text-muted text-sm">/mo</span>
+                </div>
+              </div>
+              <ul className="space-y-3 flex-1 mb-7">
+                {["Everything in Pro", "Up to 10 team members", "Shared simulation library", "Intersection mapping (compare trees)", "Team API key management", "SSO / SAML support", "Dedicated support"].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-text-secondary">
+                    <CheckCircle2 className="w-4 h-4 text-nebula-400 mt-0.5 shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/register" className="w-full text-center py-2.5 rounded-xl border border-nebula-700/40 hover:border-nebula-600/60 text-nebula-400 hover:text-nebula-300 text-sm font-medium transition-all">
+                Contact us
+              </Link>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="relative z-10 py-20 px-6">
+        <div className="max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl font-bold text-text-primary">Frequently asked questions</h2>
+          </motion.div>
+          <div className="space-y-3">
+            {[
+              {
+                q: "What AI models does it support?",
+                a: "Delphi Oracle works with Claude (Anthropic), GPT-4o (OpenAI), and any OpenAI-compatible endpoint including Ollama, Together AI, and Groq. You bring your own API key.",
+              },
+              {
+                q: "Is my data private?",
+                a: "Yes. Your profile data and API keys are encrypted at rest using AES-256. Your AI keys are decrypted only in memory during simulation calls — never logged or stored in plaintext.",
+              },
+              {
+                q: "What is a 'combination simulation'?",
+                a: "You can select multiple life domains (e.g. Career + Romantic) and the Oracle generates futures where both domains genuinely intersect — showing cross-domain tension, synergies, and cascade effects.",
+              },
+              {
+                q: "How accurate are the predictions?",
+                a: "The Oracle generates probability-weighted scenarios based on your real profile data, but these are explorations of possibility — not prophecy. The value is in stress-testing decisions and surfacing consequences you might not have considered.",
+              },
+              {
+                q: "Can I export my simulations?",
+                a: "Yes. From Settings → Data & Privacy, you can download a complete JSON export of all your simulations, profile data, and tree nodes.",
+              },
+            ].map((item, i) => (
+              <FAQItem key={i} q={item.q} a={item.a} index={i} />
             ))}
           </div>
         </div>

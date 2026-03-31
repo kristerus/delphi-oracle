@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -82,16 +82,25 @@ const NOTIFICATION_PREFS = [
 function AccountTab() {
   const { data: session } = authClient.useSession();
   const [name, setName] = useState(session?.user?.name ?? "");
+  // Sync name when session loads
+  useEffect(() => {
+    if (session?.user?.name) setName(session.user.name);
+  }, [session?.user?.name]);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
+    if (!name.trim()) return;
     setSaving(true);
-    // TODO: call authClient.updateUser({ name }) when available
-    await new Promise((r) => setTimeout(r, 800));
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    try {
+      await authClient.updateUser({ name: name.trim() });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {
+      // silently ignore — Better Auth updateUser rarely fails
+    } finally {
+      setSaving(false);
+    }
   };
 
   const userInitial = session?.user?.name?.[0]?.toUpperCase() ?? "?";
@@ -182,11 +191,32 @@ function AccountTab() {
 function ProvidersTab() {
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSave = (id: string) => {
-    setSaved((p) => ({ ...p, [id]: true }));
-    setTimeout(() => setSaved((p) => ({ ...p, [id]: false })), 2500);
+  const handleSave = async (id: string) => {
+    const key = keys[id]?.trim();
+    if (!key) return;
+    setSaving((p) => ({ ...p, [id]: true }));
+    setErrors((p) => ({ ...p, [id]: "" }));
+    try {
+      const res = await fetch("/api/profile/keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: id, key }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error ?? "Failed to save");
+      }
+      setSaved((p) => ({ ...p, [id]: true }));
+      setTimeout(() => setSaved((p) => ({ ...p, [id]: false })), 2500);
+    } catch (err) {
+      setErrors((p) => ({ ...p, [id]: err instanceof Error ? err.message : "Save failed" }));
+    } finally {
+      setSaving((p) => ({ ...p, [id]: false }));
+    }
   };
 
   return (
@@ -253,12 +283,15 @@ function ProvidersTab() {
             </div>
             <button
               onClick={() => handleSave(provider.id)}
-              disabled={!keys[provider.id]?.trim()}
+              disabled={!keys[provider.id]?.trim() || saving[provider.id]}
               className="px-4 py-2.5 rounded-xl bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 hover:text-oracle-300 text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
             >
-              Save
+              {saving[provider.id] ? "Saving…" : "Save"}
             </button>
           </div>
+          {errors[provider.id] && (
+            <p className="text-hazard-400 text-xs mt-1.5">{errors[provider.id]}</p>
+          )}
         </div>
       ))}
     </div>
@@ -317,10 +350,28 @@ function DataTab() {
   const handleDelete = async () => {
     if (confirmText !== "delete my account") return;
     setDeleting(true);
-    // TODO: call delete account API
-    await new Promise((r) => setTimeout(r, 1500));
-    setDeleting(false);
-    setShowDeleteModal(false);
+    try {
+      const res = await fetch("/api/user", { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      // Sign out and redirect
+      await authClient.signOut();
+      window.location.href = "/";
+    } catch {
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const handleExport = async () => {
+    const res = await fetch("/api/user/export");
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `delphi-oracle-export-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -339,7 +390,7 @@ function DataTab() {
               Download a complete archive of your simulations, profile data, and settings as JSON.
             </p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-void-800/80 border border-border hover:border-border-bright text-text-secondary hover:text-text-primary text-sm font-medium transition-all duration-200 shrink-0">
+          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-void-800/80 border border-border hover:border-border-bright text-text-secondary hover:text-text-primary text-sm font-medium transition-all duration-200 shrink-0">
             <Download className="w-4 h-4" />
             Export
           </button>

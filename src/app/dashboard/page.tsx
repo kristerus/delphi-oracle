@@ -532,6 +532,18 @@ export default function DashboardPage() {
     }));
   }, [oracle.simulationId, oracle.nodes, oracle.edges]);
 
+  // Cmd+N / Ctrl+N keyboard shortcut to open new simulation modal
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        setShowNewModal(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const handleSimulate = useCallback(
     async (title: string, apiKey: string, provider: string, categories: SimulationCategory[] = ["career"], personalContext?: string) => {
       setLastApiKey(apiKey);
@@ -633,6 +645,7 @@ export default function DashboardPage() {
             >
               <Plus className="w-4 h-4" />
               New simulation
+              <kbd className="hidden sm:inline-flex items-center gap-0.5 text-[10px] text-text-ghost border border-border rounded px-1 py-0.5 font-mono">⌘N</kbd>
             </button>
           </div>
 
@@ -693,6 +706,22 @@ export default function DashboardPage() {
                 </button>
               );
             })}
+
+            {/* Empty state hint for new users */}
+            {simulations.every((s) => s.id.startsWith("demo-")) && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mt-4 mx-1 p-4 rounded-xl border border-dashed border-border text-center"
+              >
+                <Sparkles className="w-5 h-5 text-oracle-600 mx-auto mb-2" />
+                <p className="text-xs font-medium text-text-secondary mb-1">Your simulations appear here</p>
+                <p className="text-xs text-text-ghost leading-relaxed">
+                  Create your first simulation to see probability-weighted futures for your decisions.
+                </p>
+              </motion.div>
+            )}
           </div>
 
           <div className="p-3 border-t border-border-subtle">

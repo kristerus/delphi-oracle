@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import Script from "next/script";
 import "@/styles/globals.css";
+import { ToastProvider } from "@/components/ui/Toaster";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://delphi-oracle.app";
 const OG_IMAGE = `${APP_URL}/og-image.png`;
@@ -112,7 +113,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );
