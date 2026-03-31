@@ -33,38 +33,45 @@ export async function GET(_req: NextRequest) {
     education: profile.education ?? [],
     riskTolerance: profile.preferences?.riskTolerance ?? "medium",
     timeHorizon: profile.preferences?.timeHorizon ?? "3y",
+    notificationPrefs: profile.preferences?.notifications ?? null,
   });
 }
 
 async function upsertProfile(userId: string, body: Record<string, unknown>) {
+  const existing = await db.query.profiles.findFirst({
+    where: eq(profiles.userId, userId),
+  });
+
+  // Merge skills: prefer body if present, fall back to existing
   const skills = Array.isArray(body.skills)
     ? (body.skills as string[])
     : typeof body.skills === "string"
     ? (body.skills as string).split(",").map((s) => s.trim()).filter(Boolean)
-    : [];
+    : (existing?.skills ?? []);
+
+  // Merge preferences: only overwrite keys that are explicitly present in body
+  const existingPrefs: Partial<ProfilePreferences> = existing?.preferences ?? {};
+  const preferences: ProfilePreferences = {
+    riskTolerance: (body.riskTolerance as ProfilePreferences["riskTolerance"]) ?? existingPrefs.riskTolerance ?? "medium",
+    timeHorizon: (body.timeHorizon as ProfilePreferences["timeHorizon"]) ?? existingPrefs.timeHorizon ?? "3y",
+    focusAreas: (body.focusAreas as string[] | undefined) ?? existingPrefs.focusAreas ?? [],
+    notifications: (body.notificationPrefs as Record<string, boolean> | undefined) ?? existingPrefs.notifications,
+  };
 
   const data = {
     userId,
-    bio: (body.bio as string) || null,
-    location: (body.location as string) || null,
-    website: (body.website as string) || null,
-    linkedinUrl: (body.linkedinUrl as string) || null,
-    githubUsername: (body.githubUsername as string) || null,
-    twitterUsername: (body.twitterUsername as string) || null,
-    experience: ((body.experience ?? []) as ExperienceEntry[]),
-    education: ((body.education ?? []) as EducationEntry[]),
+    bio: "bio" in body ? ((body.bio as string) || null) : (existing?.bio ?? null),
+    location: "location" in body ? ((body.location as string) || null) : (existing?.location ?? null),
+    website: "website" in body ? ((body.website as string) || null) : (existing?.website ?? null),
+    linkedinUrl: "linkedinUrl" in body ? ((body.linkedinUrl as string) || null) : (existing?.linkedinUrl ?? null),
+    githubUsername: "githubUsername" in body ? ((body.githubUsername as string) || null) : (existing?.githubUsername ?? null),
+    twitterUsername: "twitterUsername" in body ? ((body.twitterUsername as string) || null) : (existing?.twitterUsername ?? null),
+    experience: ("experience" in body ? (body.experience as ExperienceEntry[]) : null) ?? existing?.experience ?? [],
+    education: ("education" in body ? (body.education as EducationEntry[]) : null) ?? existing?.education ?? [],
     skills,
-    preferences: {
-      riskTolerance: ((body.riskTolerance ?? "medium") as ProfilePreferences["riskTolerance"]),
-      timeHorizon: ((body.timeHorizon ?? "3y") as ProfilePreferences["timeHorizon"]),
-      focusAreas: ((body.focusAreas ?? []) as string[]),
-    },
+    preferences,
     updatedAt: new Date(),
   };
-
-  const existing = await db.query.profiles.findFirst({
-    where: eq(profiles.userId, userId),
-  });
 
   if (existing) {
     await db.update(profiles).set(data).where(eq(profiles.userId, userId));

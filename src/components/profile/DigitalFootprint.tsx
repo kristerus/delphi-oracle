@@ -1,455 +1,115 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Globe,
-  Search,
-  Loader2,
   Github,
-  Linkedin,
-  Twitter,
-  ExternalLink,
-  CheckCircle2,
-  XCircle,
+  Globe,
+  FileText,
+  Loader2,
   AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
   RefreshCw,
-  BookOpen,
-  Award,
-  Briefcase,
-  GraduationCap,
-  Trophy,
-  Code2,
-  Newspaper,
-  Youtube,
 } from "lucide-react";
-import type {
-  DigitalFootprint as FootprintType,
-  ScrapeResult,
-  ScrapeJobStatusResponse,
-  JobStatus,
-} from "@/lib/scraper/types";
+import type { ExtractedProfileData } from "@/lib/scraper/types";
 
-// ─── Platform metadata ────────────────────────────────────────────────────────
+/* ─── Types ──────────────────────────────────────────────────────────────────── */
 
-const PLATFORM_META: Record<string, { icon: React.ElementType; label: string }> = {
-  github: { icon: Github, label: "GitHub" },
-  linkedin: { icon: Linkedin, label: "LinkedIn" },
-  twitter: { icon: Twitter, label: "Twitter / X" },
-  personal_site: { icon: Globe, label: "Personal Site" },
-  news: { icon: Newspaper, label: "News" },
-  academic: { icon: BookOpen, label: "Academic" },
-  stackoverflow: { icon: Code2, label: "Stack Overflow" },
-  crunchbase: { icon: Briefcase, label: "Crunchbase" },
-  medium: { icon: BookOpen, label: "Medium" },
-  devto: { icon: Code2, label: "Dev.to" },
-  angellist: { icon: Briefcase, label: "Wellfound" },
-  youtube: { icon: Youtube, label: "YouTube" },
-  patents: { icon: Award, label: "Patents" },
-  devpost: { icon: Trophy, label: "Devpost" },
-  kaggle: { icon: GraduationCap, label: "Kaggle" },
-};
+type ScrapeMode = "github" | "text" | "url";
 
-function getPlatformMeta(platform: string) {
-  return PLATFORM_META[platform] ?? { icon: Globe, label: platform.replace(/_/g, " ") };
+interface SavedKey {
+  id: string;
+  provider: string;
+  maskedKey: string;
 }
 
-// ─── Progress indicator ────────────────────────────────────────────────────────
+/* ─── Sub-mode toggle ────────────────────────────────────────────────────────── */
 
-type SourceStatus = "pending" | "running" | "done" | "no_result" | "error" | "confirmed" | "rejected";
+const MODES: { id: ScrapeMode; label: string; icon: React.ElementType; description: string }[] = [
+  {
+    id: "github",
+    label: "GitHub",
+    icon: Github,
+    description: "Import from a public GitHub profile — no API key needed",
+  },
+  {
+    id: "text",
+    label: "Paste text",
+    icon: FileText,
+    description: "Paste a LinkedIn bio, resume, or any career text",
+  },
+  {
+    id: "url",
+    label: "URL",
+    icon: Globe,
+    description: "Import from any public URL (portfolio, blog, etc.)",
+  },
+];
 
-function ProgressDot({ status }: { status: SourceStatus }) {
-  if (status === "running") {
-    return <Loader2 className="w-3 h-3 animate-spin text-oracle-400 shrink-0" />;
-  }
-  if (status === "done" || status === "confirmed") {
-    return <CheckCircle2 className="w-3 h-3 text-signal-400 shrink-0" />;
-  }
-  if (status === "error") {
-    return <AlertCircle className="w-3 h-3 text-hazard-400 shrink-0" />;
-  }
-  if (status === "rejected") {
-    return <XCircle className="w-3 h-3 text-hazard-400 shrink-0" />;
-  }
-  if (status === "no_result") {
-    return <div className="w-3 h-3 rounded-full border border-border shrink-0" />;
-  }
-  // pending
-  return <div className="w-3 h-3 rounded-full border border-border-bright shrink-0 animate-pulse" />;
-}
+/* ─── Extracted profile display ──────────────────────────────────────────────── */
 
-function ScanProgress({ progress }: { progress: Record<string, string> }) {
-  const platforms = Object.entries(progress);
-  if (platforms.length === 0) return null;
-
-  return (
-    <div className="glass-card rounded-xl p-4">
-      <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Scanning sources</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {platforms.map(([platform, status]) => {
-          const { icon: Icon, label } = getPlatformMeta(platform);
-          return (
-            <div key={platform} className="flex items-center gap-2">
-              <ProgressDot status={status as SourceStatus} />
-              <Icon className="w-3.5 h-3.5 text-text-ghost shrink-0" />
-              <span className="text-xs text-text-secondary truncate">{label}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Result card ──────────────────────────────────────────────────────────────
-
-function ResultCard({
-  result,
-  confirmed,
-  rejected,
-  onConfirm,
-  onReject,
+function ProfilePreview({
+  profile,
+  onApply,
+  applying,
 }: {
-  result: ScrapeResult;
-  confirmed: boolean;
-  rejected: boolean;
-  onConfirm: () => void;
-  onReject: () => void;
+  profile: ExtractedProfileData;
+  onApply: () => void;
+  applying: boolean;
 }) {
-  const { icon: Icon, label } = getPlatformMeta(result.platform);
-  const confidencePct = Math.round(result.confidence * 100);
-  const confidenceColor =
-    result.confidence >= 0.8
-      ? "text-signal-400"
-      : result.confidence >= 0.6
-      ? "text-oracle-500"
-      : "text-hazard-400";
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`glass rounded-xl p-4 border transition-colors ${
-        confirmed
-          ? "border-signal-700/50 bg-signal-900/10"
-          : rejected
-          ? "border-hazard-700/30 opacity-50"
-          : "border-border"
-      }`}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-3"
     >
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="flex items-center gap-2">
-          <Icon className="w-4 h-4 text-text-muted shrink-0" />
-          <span className="text-xs font-medium text-text-secondary">{label}</span>
+      {/* Header */}
+      <div className="flex items-start gap-3 glass rounded-xl p-4 border border-signal-700/30">
+        <CheckCircle2 className="w-4 h-4 text-signal-400 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-text-primary">
+            {profile.name ? `Found profile for ${profile.name}` : "Profile data extracted"}
+          </p>
+          {profile.headline && (
+            <p className="text-xs text-text-secondary mt-0.5">{profile.headline}</p>
+          )}
+          {profile.location && (
+            <p className="text-xs text-text-ghost mt-0.5">{profile.location}</p>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-mono ${confidenceColor}`}>{confidencePct}% match</span>
-          <a
-            href={result.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="text-text-ghost hover:text-text-secondary transition-colors"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
-      </div>
-      <p className="text-sm text-text-primary font-medium mb-1 truncate">{result.title}</p>
-      <p className="text-xs text-text-secondary leading-relaxed mb-3">{result.snippet}</p>
-      <div className="flex gap-2">
         <button
-          onClick={onConfirm}
-          disabled={confirmed}
-          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
-            confirmed
-              ? "bg-signal-900/30 border-signal-700/50 text-signal-400 cursor-default"
-              : "bg-void-800/60 border-border hover:border-signal-700/50 hover:bg-signal-900/20 text-text-secondary hover:text-signal-400"
-          }`}
+          onClick={() => setExpanded((v) => !v)}
+          className="text-text-ghost hover:text-text-secondary transition-colors shrink-0"
+          title={expanded ? "Collapse" : "Expand"}
         >
-          <CheckCircle2 className="w-3 h-3" />
-          {confirmed ? "Confirmed" : "Confirm"}
-        </button>
-        <button
-          onClick={onReject}
-          disabled={rejected}
-          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
-            rejected
-              ? "bg-hazard-900/30 border-hazard-700/50 text-hazard-400 cursor-default"
-              : "bg-void-800/60 border-border hover:border-hazard-700/50 hover:bg-hazard-900/20 text-text-secondary hover:text-hazard-400"
-          }`}
-        >
-          <XCircle className="w-3 h-3" />
-          {rejected ? "Rejected" : "Reject"}
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
       </div>
-    </motion.div>
-  );
-}
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
-export default function DigitalFootprint() {
-  const [query, setQuery] = useState("");
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<JobStatus>("pending");
-  const [progress, setProgress] = useState<Record<string, string>>({});
-  const [footprint, setFootprint] = useState<FootprintType | null>(null);
-  const [confirmedUrls, setConfirmedUrls] = useState<Set<string>>(new Set());
-  const [rejectedUrls, setRejectedUrls] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // ── Polling ────────────────────────────────────────────────────────────────
-
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
-  const fetchResults = useCallback(async (id: string) => {
-    try {
-      const res = await fetch(`/api/oracle/scrape?jobId=${id}&resultsOnly=true`);
-      if (res.status === 202) return; // still running
-      if (!res.ok) throw new Error(`Failed to fetch results (${res.status})`);
-      const data = await res.json();
-      if (data.footprint) {
-        setFootprint(data.footprint);
-      }
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const pollStatus = useCallback(
-    async (id: string) => {
-      try {
-        const res = await fetch(`/api/oracle/scrape?jobId=${id}`);
-        if (!res.ok) {
-          stopPolling();
-          setError("Failed to check scan status.");
-          setLoading(false);
-          return;
-        }
-        const data: ScrapeJobStatusResponse = await res.json();
-        setProgress(data.progress ?? {});
-        setJobStatus(data.status);
-
-        if (data.status === "complete" || data.status === "partial" || data.status === "failed") {
-          stopPolling();
-          if (data.status === "failed") {
-            setError("Scan found no results. Try a more specific query.");
-            setLoading(false);
-          } else {
-            await fetchResults(id);
-          }
-        }
-      } catch {
-        stopPolling();
-        setError("Lost connection to scan service.");
-        setLoading(false);
-      }
-    },
-    [stopPolling, fetchResults]
-  );
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, [stopPolling]);
-
-  // ── Start scrape ───────────────────────────────────────────────────────────
-
-  const handleScrape = async () => {
-    if (!query.trim()) return;
-
-    stopPolling();
-    setLoading(true);
-    setError(null);
-    setFootprint(null);
-    setProgress({});
-    setJobId(null);
-    setJobStatus("pending");
-    setConfirmedUrls(new Set());
-    setRejectedUrls(new Set());
-
-    try {
-      const res = await fetch("/api/oracle/scrape", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      const id: string = data.jobId;
-      setJobId(id);
-      setJobStatus("running");
-
-      // Start polling every 2s
-      pollRef.current = setInterval(() => pollStatus(id), 2000);
-    } catch (err) {
-      setError(`Scan failed: ${String(err)}`);
-      setLoading(false);
-    }
-  };
-
-  // ── Reset ──────────────────────────────────────────────────────────────────
-
-  const handleReset = () => {
-    stopPolling();
-    setJobId(null);
-    setJobStatus("pending");
-    setProgress({});
-    setFootprint(null);
-    setError(null);
-    setLoading(false);
-    setConfirmedUrls(new Set());
-    setRejectedUrls(new Set());
-  };
-
-  // ── Confirm / Reject ───────────────────────────────────────────────────────
-
-  const toggleConfirm = (url: string) => {
-    setConfirmedUrls((prev) => {
-      const next = new Set(prev);
-      if (next.has(url)) {
-        next.delete(url);
-      } else {
-        next.add(url);
-        setRejectedUrls((r) => { const rn = new Set(r); rn.delete(url); return rn; });
-      }
-      return next;
-    });
-  };
-
-  const toggleReject = (url: string) => {
-    setRejectedUrls((prev) => {
-      const next = new Set(prev);
-      if (next.has(url)) {
-        next.delete(url);
-      } else {
-        next.add(url);
-        setConfirmedUrls((c) => { const cn = new Set(c); cn.delete(url); return cn; });
-      }
-      return next;
-    });
-  };
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-
-  const confirmedResults = footprint?.results.filter((r) => confirmedUrls.has(r.url)) ?? [];
-  const allSkills = footprint?.extractedProfile?.skills ?? [];
-  const isScanning = loading || jobStatus === "running";
-  const hasProgress = Object.keys(progress).length > 0;
-  const doneCount = Object.values(progress).filter((s) => s === "done").length;
-
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  return (
-    <div className="max-w-2xl space-y-5">
-      {/* Search */}
-      <div className="glass-card rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-text-primary mb-1">Find your digital footprint</h2>
-        <p className="text-xs text-text-muted mb-4">
-          Enter your name and optionally your company or location. The scanner searches{" "}
-          {Object.keys(PLATFORM_META).length} public sources in parallel.
-        </p>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !isScanning && handleScrape()}
-              placeholder="Alex Rivera, software engineer at TechCorp"
-              className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200"
-            />
-          </div>
-          <button
-            onClick={handleScrape}
-            disabled={isScanning || !query.trim()}
-            className="flex items-center gap-2 bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 hover:text-oracle-300 font-medium text-sm px-5 py-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-            {isScanning ? "Scanning…" : "Scan"}
-          </button>
-        </div>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-2.5 bg-hazard-700/20 border border-hazard-600/30 text-hazard-400 text-sm px-4 py-3 rounded-xl">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {/* Live progress (while scanning) */}
+      {/* Expanded details */}
       <AnimatePresence>
-        {isScanning && hasProgress && (
+        {expanded && (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden space-y-3"
           >
-            <ScanProgress progress={progress} />
-            {doneCount > 0 && (
-              <p className="text-xs text-text-ghost mt-2 text-center">
-                {doneCount} of {Object.keys(progress).length} sources scanned…
-              </p>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Results */}
-      <AnimatePresence>
-        {footprint && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-4"
-          >
-            {/* Summary */}
-            <div className="flex items-start gap-3 glass rounded-xl p-4 border border-signal-700/30">
-              <CheckCircle2 className="w-4 h-4 text-signal-400 shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-text-primary font-medium mb-0.5">Footprint found</p>
-                <p className="text-xs text-text-secondary">{footprint.summary}</p>
-                <p className="text-xs text-text-ghost mt-1">
-                  Scanned in {(footprint.processingTimeMs / 1000).toFixed(1)}s · {footprint.results.length} sources found
-                </p>
-              </div>
-              <button
-                onClick={handleReset}
-                className="text-text-ghost hover:text-text-secondary transition-colors shrink-0"
-                title="Start a new scan"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Progress summary (after scan) */}
-            {hasProgress && (
-              <ScanProgress progress={progress} />
-            )}
-
-            {/* Extracted skills */}
-            {allSkills.length > 0 && (
+            {/* Skills */}
+            {profile.skills.length > 0 && (
               <div className="glass-card rounded-xl p-4">
-                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Detected skills</p>
-                <div className="flex flex-wrap gap-2">
-                  {allSkills.map((skill) => (
+                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                  Skills detected ({profile.skills.length})
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.skills.map((skill) => (
                     <span
                       key={skill}
                       className="px-2.5 py-1 rounded-lg bg-nebula-900/50 border border-nebula-800/40 text-xs text-nebula-300"
@@ -461,52 +121,377 @@ export default function DigitalFootprint() {
               </div>
             )}
 
-            {/* Source cards — confirm / reject each */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                  Sources ({footprint.results.length})
+            {/* Experience */}
+            {profile.experience.length > 0 && (
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                  Experience ({profile.experience.length})
                 </p>
-                {confirmedResults.length > 0 && (
-                  <span className="text-xs text-signal-400">
-                    {confirmedResults.length} confirmed
-                  </span>
-                )}
+                <div className="space-y-2">
+                  {profile.experience.map((exp, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="w-1 h-1 rounded-full bg-oracle-500 mt-1.5 shrink-0" />
+                      <div>
+                        <p className="text-xs text-text-primary font-medium">
+                          {exp.title} at {exp.company}
+                        </p>
+                        {exp.duration && (
+                          <p className="text-xs text-text-ghost">{exp.duration}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-3">
-                {footprint.results.map((r) => (
-                  <ResultCard
-                    key={r.url}
-                    result={r}
-                    confirmed={confirmedUrls.has(r.url)}
-                    rejected={rejectedUrls.has(r.url)}
-                    onConfirm={() => toggleConfirm(r.url)}
-                    onReject={() => toggleReject(r.url)}
-                  />
-                ))}
-              </div>
-            </div>
+            )}
 
-            {/* Apply to profile */}
-            <button
-              disabled={confirmedResults.length === 0}
-              className="w-full flex items-center justify-center gap-2 bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 font-medium text-sm py-3 rounded-xl transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              {confirmedResults.length === 0
-                ? "Confirm sources above to apply"
-                : `Apply ${confirmedResults.length} confirmed source${confirmedResults.length > 1 ? "s" : ""} to profile`}
-            </button>
+            {/* Education */}
+            {profile.education.length > 0 && (
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                  Education ({profile.education.length})
+                </p>
+                <div className="space-y-2">
+                  {profile.education.map((edu, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="w-1 h-1 rounded-full bg-nebula-400 mt-1.5 shrink-0" />
+                      <div>
+                        <p className="text-xs text-text-primary font-medium">
+                          {edu.institution}
+                        </p>
+                        {edu.degree && (
+                          <p className="text-xs text-text-ghost">{edu.degree}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Open source projects */}
+            {profile.openSourceProjects && profile.openSourceProjects.length > 0 && (
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+                  Open source projects ({profile.openSourceProjects.length})
+                </p>
+                <div className="space-y-1">
+                  {profile.openSourceProjects.map((proj, i) => (
+                    <p key={i} className="text-xs text-text-secondary truncate">
+                      {proj}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Bio */}
+            {profile.bio && (
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">Bio</p>
+                <p className="text-xs text-text-secondary leading-relaxed">{profile.bio}</p>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* Apply button */}
+      <button
+        onClick={onApply}
+        disabled={applying}
+        className="w-full flex items-center justify-center gap-2 bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 font-medium text-sm py-3 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {applying ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Sparkles className="w-4 h-4" />
+        )}
+        {applying ? "Applying to profile…" : "Apply to profile"}
+      </button>
+    </motion.div>
+  );
+}
+
+/* ─── Main component ─────────────────────────────────────────────────────────── */
+
+export default function DigitalFootprint() {
+  const [scrapeMode, setScrapeMode] = useState<ScrapeMode>("github");
+  const [scrapeInput, setScrapeInput] = useState("");
+  const [scraping, setScraping] = useState(false);
+  const [scrapeResult, setScrapeResult] = useState<ExtractedProfileData | null>(null);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
+
+  // API key state — loaded from saved keys
+  const [savedKeys, setSavedKeys] = useState<SavedKey[]>([]);
+  const [keysLoaded, setKeysLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/profile/keys")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: SavedKey[]) => {
+        setSavedKeys(data);
+        setKeysLoaded(true);
+      })
+      .catch(() => setKeysLoaded(true));
+  }, []);
+
+  // When mode changes, reset results
+  const handleModeChange = (mode: ScrapeMode) => {
+    setScrapeMode(mode);
+    setScrapeInput("");
+    setScrapeResult(null);
+    setScrapeError(null);
+    setApplied(false);
+  };
+
+  const getApiKey = (): { apiKey: string; provider: string } | null => {
+    const claudeKey = savedKeys.find((k) => k.provider === "claude");
+    const openaiKey = savedKeys.find((k) => k.provider === "openai");
+    const customKey = savedKeys.find((k) => k.provider === "custom");
+    const key = claudeKey ?? openaiKey ?? customKey;
+    if (!key) return null;
+    // For text/url we need the real key — but we only have masked versions here.
+    // The backend will use the stored (encrypted) key via the session, so we pass
+    // the provider name and the server fetches it from the vault.
+    // Actually we store the raw key encrypted server-side; the client just passes
+    // provider so the server can look it up. But the current API design takes apiKey
+    // directly. Return a sentinel so the UI can warn when no key is saved.
+    return { apiKey: "__use_saved__", provider: key.provider };
+  };
+
+  const handleScrape = async () => {
+    if (!scrapeInput.trim()) return;
+
+    setScraping(true);
+    setScrapeError(null);
+    setScrapeResult(null);
+    setApplied(false);
+
+    try {
+      let body: Record<string, string>;
+
+      if (scrapeMode === "github") {
+        body = { type: "github", username: scrapeInput.trim() };
+      } else {
+        // text or url modes need an API key
+        const keyInfo = getApiKey();
+        if (!keyInfo) {
+          setScrapeError("No AI key saved. Add one in the AI Keys tab first.");
+          setScraping(false);
+          return;
+        }
+        if (scrapeMode === "text") {
+          body = { type: "text", content: scrapeInput.trim(), apiKey: keyInfo.apiKey, provider: keyInfo.provider };
+        } else {
+          body = { type: "url", url: scrapeInput.trim(), apiKey: keyInfo.apiKey, provider: keyInfo.provider };
+        }
+      }
+
+      const res = await fetch("/api/oracle/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = (await res.json()) as { status?: string; profile?: ExtractedProfileData; error?: string };
+
+      if (!res.ok || !data.profile) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+
+      setScrapeResult(data.profile);
+    } catch (err) {
+      setScrapeError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setScraping(false);
+    }
+  };
+
+  const handleApplyProfile = async () => {
+    if (!scrapeResult) return;
+    setApplying(true);
+
+    try {
+      // Map ExtractedProfileData to the profile API format
+      const profilePayload = {
+        bio: scrapeResult.bio ?? scrapeResult.headline ?? "",
+        location: scrapeResult.location ?? "",
+        website: scrapeResult.urls.find((u) => !u.includes("github.com")) ?? "",
+        githubUsername: scrapeResult.socialHandles?.github ?? "",
+        linkedinUrl: scrapeResult.socialHandles?.linkedin ?? "",
+        skills: scrapeResult.skills,
+        experience: scrapeResult.experience.map((e) => ({
+          company: e.company,
+          title: e.title,
+          startDate: "",
+          endDate: "",
+          description: e.description ?? "",
+        })),
+        education: scrapeResult.education.map((e) => ({
+          institution: e.institution,
+          degree: e.degree ?? "",
+          field: "",
+          startYear: "",
+          endYear: e.years ?? "",
+        })),
+      };
+
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profilePayload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      setApplied(true);
+    } catch (err) {
+      setScrapeError(err instanceof Error ? err.message : "Failed to apply profile");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const currentMode = MODES.find((m) => m.id === scrapeMode)!;
+  const needsKey = scrapeMode !== "github";
+  const hasKey = savedKeys.length > 0;
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      {/* Mode selector */}
+      <div className="glass-card rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-text-primary mb-1">Import from external source</h2>
+        <p className="text-xs text-text-muted mb-4">
+          Pull in your professional data automatically. GitHub works instantly — no key needed.
+        </p>
+
+        {/* Toggle buttons */}
+        <div className="flex gap-1 bg-void-900/60 rounded-xl p-1 mb-4 border border-border-subtle w-fit">
+          {MODES.map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => handleModeChange(mode.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                scrapeMode === mode.id
+                  ? "bg-oracle-500/15 border border-oracle-800/50 text-oracle-400"
+                  : "text-text-muted hover:text-text-secondary"
+              }`}
+            >
+              <mode.icon className="w-3.5 h-3.5" />
+              {mode.label}
+            </button>
+          ))}
+        </div>
+
+        <p className="text-xs text-text-ghost mb-3">{currentMode.description}</p>
+
+        {/* Key warning for text/url modes */}
+        {needsKey && keysLoaded && !hasKey && (
+          <div className="flex items-center gap-2 text-xs text-oracle-400 bg-oracle-900/20 border border-oracle-800/30 rounded-lg px-3 py-2 mb-3">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            Add an AI key in the &ldquo;AI Keys&rdquo; tab to use this mode.
+          </div>
+        )}
+
+        {/* Input area */}
+        {scrapeMode === "text" ? (
+          <textarea
+            value={scrapeInput}
+            onChange={(e) => setScrapeInput(e.target.value)}
+            placeholder="Paste your LinkedIn bio, resume text, or any professional summary…"
+            rows={5}
+            className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 resize-none mb-3"
+          />
+        ) : (
+          <input
+            type={scrapeMode === "url" ? "url" : "text"}
+            value={scrapeInput}
+            onChange={(e) => setScrapeInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !scraping && handleScrape()}
+            placeholder={
+              scrapeMode === "github"
+                ? "GitHub username (e.g. torvalds)"
+                : "https://yoursite.com/about"
+            }
+            className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 mb-3"
+          />
+        )}
+
+        {/* Import button */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleScrape}
+            disabled={scraping || !scrapeInput.trim() || (needsKey && keysLoaded && !hasKey)}
+            className="flex items-center gap-2 bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 hover:text-oracle-300 font-medium text-sm px-5 py-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {scraping ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <currentMode.icon className="w-4 h-4" />
+            )}
+            {scraping ? "Importing…" : "Import"}
+          </button>
+
+          {scrapeResult && (
+            <button
+              onClick={() => {
+                setScrapeResult(null);
+                setScrapeInput("");
+                setApplied(false);
+              }}
+              className="flex items-center gap-1.5 text-xs text-text-ghost hover:text-text-secondary transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Error */}
+      {scrapeError && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-2.5 bg-hazard-700/20 border border-hazard-600/30 text-hazard-400 text-sm px-4 py-3 rounded-xl"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{scrapeError}</span>
+        </motion.div>
+      )}
+
+      {/* Applied confirmation */}
+      {applied && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2.5 bg-signal-900/20 border border-signal-700/30 text-signal-400 text-sm px-4 py-3 rounded-xl"
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          Profile applied. Switch to &ldquo;My Profile&rdquo; tab to review and save.
+        </motion.div>
+      )}
+
+      {/* Result preview */}
+      {scrapeResult && !applied && (
+        <ProfilePreview
+          profile={scrapeResult}
+          onApply={handleApplyProfile}
+          applying={applying}
+        />
+      )}
+
       {/* Empty state */}
-      {!footprint && !isScanning && !error && (
-        <div className="text-center py-12 text-text-ghost text-sm">
-          Enter your name above to scan {Object.keys(PLATFORM_META).length} public sources for your digital footprint.
-          <br />
-          Only publicly available data is accessed.
+      {!scrapeResult && !scraping && !scrapeError && (
+        <div className="text-center py-10 text-text-ghost text-sm">
+          {scrapeMode === "github"
+            ? "Enter a GitHub username above to import public profile data instantly."
+            : scrapeMode === "text"
+            ? "Paste your LinkedIn bio or resume text and we'll extract your profile data."
+            : "Enter a URL to any public profile page and we'll parse it for you."}
         </div>
       )}
     </div>

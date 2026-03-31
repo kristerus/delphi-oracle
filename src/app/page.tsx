@@ -757,8 +757,8 @@ export default function LandingPage() {
             Built with Next.js, FastAPI, and the belief that the future is not fixed.
           </p>
           <div className="flex items-center gap-5 text-sm text-text-muted">
-            <a href="#" className="hover:text-text-primary transition-colors">Privacy</a>
-            <a href="#" className="hover:text-text-primary transition-colors">Terms</a>
+            <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-text-primary transition-colors">Terms</Link>
             <a href="https://github.com" className="hover:text-text-primary transition-colors">GitHub</a>
           </div>
         </div>

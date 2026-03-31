@@ -191,6 +191,7 @@ export interface ProfilePreferences {
   riskTolerance: "low" | "medium" | "high";
   timeHorizon: "1y" | "3y" | "5y" | "10y";
   focusAreas: string[];
+  notifications?: Record<string, boolean>;
 }
 
 export interface NodeDetails {

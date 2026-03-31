@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -17,6 +17,8 @@ import {
   X,
   Camera,
   Save,
+  Lock,
+  ChevronDown,
 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import { authClient } from "@/lib/auth-client";
@@ -89,6 +91,13 @@ function AccountTab() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSaved, setPasswordSaved] = useState(false);
+
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
@@ -100,6 +109,32 @@ function AccountTab() {
       // silently ignore — Better Auth updateUser rarely fails
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (!currentPassword || newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    setChangingPassword(true);
+    setPasswordError(null);
+    try {
+      const { error } = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+        revokeOtherSessions: false,
+      });
+      if (error) throw new Error(error.message ?? "Failed to update password");
+      setPasswordSaved(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setShowPasswordForm(false);
+      setTimeout(() => setPasswordSaved(false), 3000);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : "Failed to update password");
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -181,6 +216,61 @@ function AccountTab() {
               <><Save className="w-4 h-4" /> Save changes</>
             )}
           </button>
+
+          {/* Change password */}
+          <div className="mt-6 pt-6 border-t border-border-subtle">
+            <button
+              onClick={() => setShowPasswordForm((v) => !v)}
+              className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors flex items-center gap-2"
+            >
+              <Lock className="w-4 h-4" />
+              Change password
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showPasswordForm ? "rotate-180" : ""}`} />
+            </button>
+
+            <AnimatePresence>
+              {showPasswordForm && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pt-4 space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary mb-1.5">Current password</label>
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary mb-1.5">New password</label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Minimum 8 characters"
+                        className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all"
+                      />
+                    </div>
+                    {passwordError && <p className="text-xs text-hazard-400">{passwordError}</p>}
+                    {passwordSaved && <p className="text-xs text-signal-400 flex items-center gap-1"><Check className="w-3 h-3" /> Password updated</p>}
+                    <button
+                      onClick={handlePasswordChange}
+                      disabled={!currentPassword || !newPassword || changingPassword}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-void-800/80 border border-border hover:border-border-bright text-text-secondary hover:text-text-primary text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {changingPassword ? "Updating…" : "Update password"}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </div>
@@ -194,6 +284,21 @@ function ProvidersTab() {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [savedKeys, setSavedKeys] = useState<Record<string, { maskedKey: string; id: string }>>({});
+  const [removing, setRemoving] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    fetch("/api/profile/keys")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: { id: string; provider: string; maskedKey: string }[]) => {
+        const map: Record<string, { maskedKey: string; id: string }> = {};
+        for (const entry of data) {
+          map[entry.provider] = { maskedKey: entry.maskedKey, id: entry.id };
+        }
+        setSavedKeys(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSave = async (id: string) => {
     const key = keys[id]?.trim();
@@ -210,12 +315,51 @@ function ProvidersTab() {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error ?? "Failed to save");
       }
+      const result = await res.json().catch(() => ({}));
       setSaved((p) => ({ ...p, [id]: true }));
+      // Refresh saved key entry
+      if (result.maskedKey) {
+        setSavedKeys((p) => ({ ...p, [id]: { maskedKey: result.maskedKey, id: result.id ?? p[id]?.id ?? "" } }));
+      } else {
+        fetch("/api/profile/keys")
+          .then((r) => (r.ok ? r.json() : []))
+          .then((data: { id: string; provider: string; maskedKey: string }[]) => {
+            const map: Record<string, { maskedKey: string; id: string }> = {};
+            for (const entry of data) {
+              map[entry.provider] = { maskedKey: entry.maskedKey, id: entry.id };
+            }
+            setSavedKeys(map);
+          })
+          .catch(() => {});
+      }
+      setKeys((p) => ({ ...p, [id]: "" }));
       setTimeout(() => setSaved((p) => ({ ...p, [id]: false })), 2500);
     } catch (err) {
       setErrors((p) => ({ ...p, [id]: err instanceof Error ? err.message : "Save failed" }));
     } finally {
       setSaving((p) => ({ ...p, [id]: false }));
+    }
+  };
+
+  const handleRemove = async (id: string) => {
+    const entry = savedKeys[id];
+    if (!entry) return;
+    setRemoving((p) => ({ ...p, [id]: true }));
+    try {
+      const res = await fetch(`/api/profile/keys?id=${entry.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error ?? "Failed to remove");
+      }
+      setSavedKeys((p) => {
+        const next = { ...p };
+        delete next[id];
+        return next;
+      });
+    } catch (err) {
+      setErrors((p) => ({ ...p, [id]: err instanceof Error ? err.message : "Remove failed" }));
+    } finally {
+      setRemoving((p) => ({ ...p, [id]: false }));
     }
   };
 
@@ -239,61 +383,81 @@ function ProvidersTab() {
         </div>
       </div>
 
-      {AI_PROVIDERS.map((provider) => (
-        <div key={provider.id} className="glass-card rounded-2xl p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-sm font-semibold text-text-primary">{provider.name}</p>
-                {provider.recommended && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-oracle-900/50 border border-oracle-800/40 text-oracle-400 font-medium">
-                    Recommended
-                  </span>
+      {AI_PROVIDERS.map((provider) => {
+        const existing = savedKeys[provider.id];
+        return (
+          <div key={provider.id} className="glass-card rounded-2xl p-5">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-sm font-semibold text-text-primary">{provider.name}</p>
+                  {provider.recommended && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-oracle-900/50 border border-oracle-800/40 text-oracle-400 font-medium">
+                      Recommended
+                    </span>
+                  )}
+                  {existing && !saved[provider.id] && (
+                    <span className="flex items-center gap-1 text-xs text-signal-400 font-medium">
+                      <Check className="w-3 h-3" /> Saved
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-text-muted">{provider.description}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-3">
+                {saved[provider.id] && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex items-center gap-1 text-xs text-signal-400"
+                  >
+                    <Check className="w-3 h-3" /> Saved
+                  </motion.span>
+                )}
+                {existing && (
+                  <button
+                    onClick={() => handleRemove(provider.id)}
+                    disabled={removing[provider.id]}
+                    className="p-1.5 rounded-lg text-text-muted hover:text-hazard-400 hover:bg-hazard-700/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Remove saved key"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </div>
-              <p className="text-xs text-text-muted">{provider.description}</p>
             </div>
-            {saved[provider.id] && (
-              <motion.span
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-1 text-xs text-signal-400 shrink-0 ml-3"
-              >
-                <Check className="w-3 h-3" /> Saved
-              </motion.span>
-            )}
-          </div>
 
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type={visible[provider.id] ? "text" : "password"}
-                value={keys[provider.id] ?? ""}
-                onChange={(e) => setKeys((p) => ({ ...p, [provider.id]: e.target.value }))}
-                placeholder={provider.placeholder}
-                className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl pl-4 pr-11 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 font-mono"
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={visible[provider.id] ? "text" : "password"}
+                  value={keys[provider.id] ?? ""}
+                  onChange={(e) => setKeys((p) => ({ ...p, [provider.id]: e.target.value }))}
+                  placeholder={existing ? `Saved — type to replace (${existing.maskedKey})` : provider.placeholder}
+                  className="w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl pl-4 pr-11 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setVisible((p) => ({ ...p, [provider.id]: !p[provider.id] }))}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
+                >
+                  {visible[provider.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <button
-                type="button"
-                onClick={() => setVisible((p) => ({ ...p, [provider.id]: !p[provider.id] }))}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
+                onClick={() => handleSave(provider.id)}
+                disabled={!keys[provider.id]?.trim() || saving[provider.id]}
+                className="px-4 py-2.5 rounded-xl bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 hover:text-oracle-300 text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               >
-                {visible[provider.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {saving[provider.id] ? "Saving…" : "Save"}
               </button>
             </div>
-            <button
-              onClick={() => handleSave(provider.id)}
-              disabled={!keys[provider.id]?.trim() || saving[provider.id]}
-              className="px-4 py-2.5 rounded-xl bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 hover:text-oracle-300 text-sm font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-            >
-              {saving[provider.id] ? "Saving…" : "Save"}
-            </button>
+            {errors[provider.id] && (
+              <p className="text-hazard-400 text-xs mt-1.5">{errors[provider.id]}</p>
+            )}
           </div>
-          {errors[provider.id] && (
-            <p className="text-hazard-400 text-xs mt-1.5">{errors[provider.id]}</p>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -303,6 +467,35 @@ function NotificationsTab() {
   const [prefs, setPrefs] = useState<Record<string, boolean>>(
     Object.fromEntries(NOTIFICATION_PREFS.map((p) => [p.id, p.defaultOn]))
   );
+  const [loaded, setLoaded] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.notificationPrefs) {
+          setPrefs((prev) => ({ ...prev, ...data.notificationPrefs }));
+        }
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  const toggle = (id: string) => {
+    setPrefs((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notificationPrefs: next }),
+        }).catch(() => {});
+      }, 800);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -313,13 +506,13 @@ function NotificationsTab() {
 
       <div className="glass-card rounded-2xl divide-y divide-border-subtle overflow-hidden">
         {NOTIFICATION_PREFS.map((pref) => (
-          <div key={pref.id} className="flex items-center justify-between px-5 py-4">
+          <div key={pref.id} className={`flex items-center justify-between px-5 py-4 transition-opacity ${loaded ? "" : "opacity-50"}`}>
             <div>
               <p className="text-sm font-medium text-text-primary">{pref.label}</p>
               <p className="text-xs text-text-muted mt-0.5">{pref.description}</p>
             </div>
             <button
-              onClick={() => setPrefs((p) => ({ ...p, [pref.id]: !p[pref.id] }))}
+              onClick={() => toggle(pref.id)}
               className={`relative w-10 h-5.5 rounded-full transition-all duration-200 shrink-0 ml-4 ${
                 prefs[pref.id] ? "bg-oracle-500" : "bg-void-700 border border-border"
               }`}

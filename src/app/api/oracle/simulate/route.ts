@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { simulations, futureNodes } from "@/lib/db/schema";
+import { simulations, futureNodes, apiKeys } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { callAI, parseAIJson } from "@/lib/ai/client";
 import { buildCombinedSystemPrompt, buildCombinedUserPrompt } from "@/lib/ai/prompts";
 import type { AIClientConfig, UserProfile, SimulationTree, SimulationCategory } from "@/lib/ai/types";
@@ -10,6 +11,7 @@ import { nanoid } from "nanoid";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeUserText, sanitizeProfile } from "@/lib/sanitize";
 import { logger, toUserError } from "@/lib/logger";
+import { decrypt } from "@/lib/crypto";
 
 interface SimulateRequest {
   decision: string;
@@ -66,6 +68,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Allow using saved profile key instead of client-supplied key
+    let resolvedApiKey = body.apiKey as string;
+    let resolvedProvider = body.provider as string;
+    if (resolvedApiKey === "__profile__") {
+      const savedKeys = await db.query.apiKeys.findMany({
+        where: eq(apiKeys.userId, session.user.id),
+      });
+      const preferred =
+        savedKeys.find((k) => k.provider === (body.provider ?? "claude")) ??
+        savedKeys.find((k) => k.provider === "claude") ??
+        savedKeys.find((k) => k.provider === "openai") ??
+        savedKeys[0];
+      if (!preferred) {
+        return NextResponse.json(
+          { error: "No saved API key found. Add one in Settings \u2192 AI Providers." },
+          { status: 400 }
+        );
+      }
+      resolvedApiKey = decrypt(preferred.encryptedKey);
+      resolvedProvider = preferred.provider;
+    }
+
     // Sanitize user inputs before forwarding to AI
     let cleanDecision: string;
     let cleanProfile: UserProfile;
@@ -81,8 +105,8 @@ export async function POST(req: NextRequest) {
     }
 
     const aiConfig: AIClientConfig = {
-      provider: body.provider ?? "claude",
-      apiKey: body.apiKey,
+      provider: (resolvedProvider ?? "claude") as "claude" | "openai" | "custom",
+      apiKey: resolvedApiKey,
       model: body.model,
     };
 

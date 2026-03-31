@@ -27,8 +27,9 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
 
   // ── Backend ──────────────────────────────────────────────────────────────────
-  BACKEND_URL: z.string().url().default("http://localhost:8000"),
-  BACKEND_API_KEY: z.string().min(1, "BACKEND_API_KEY is required"),
+  // These are kept for backward compat but are no longer required by the app.
+  BACKEND_URL: z.string().url().optional().default("http://localhost:8000"),
+  BACKEND_API_KEY: z.string().optional(),
 
   // ── App ──────────────────────────────────────────────────────────────────────
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),

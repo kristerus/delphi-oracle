@@ -18,6 +18,8 @@ import {
   TrendingUp,
   Activity,
   User,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/layout/Navbar";
@@ -256,15 +258,20 @@ const DEMO_SIMULATIONS: SimulationMeta[] = [
 function NewSimulationModal({
   onClose,
   onSimulate,
+  hasSavedKeys = false,
+  savedProvider: initialSavedProvider = "claude",
 }: {
   onClose: () => void;
   onSimulate: (title: string, apiKey: string, provider: string, categories: SimulationCategory[], personalContext?: string) => Promise<void>;
+  hasSavedKeys?: boolean;
+  savedProvider?: "claude" | "openai" | "custom";
 }) {
   const [categories, setCategories] = useState<SimulationCategory[]>(["career"]);
   const [title, setTitle] = useState("");
   const [personalContext, setPersonalContext] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [provider, setProvider] = useState("claude");
+  const [apiKey, setApiKey] = useState(hasSavedKeys ? "__profile__" : "");
+  const [provider, setProvider] = useState(hasSavedKeys ? initialSavedProvider : "claude");
+  const [useSavedKey, setUseSavedKey] = useState(hasSavedKeys);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -285,12 +292,14 @@ function NewSimulationModal({
     );
   };
 
+  const effectiveApiKey = useSavedKey ? "__profile__" : apiKey;
+
   const handle = async () => {
-    if (!title.trim() || !apiKey.trim()) return;
+    if (!title.trim() || !effectiveApiKey.trim()) return;
     setGenerating(true);
     setError(null);
     try {
-      await onSimulate(title.trim(), apiKey.trim(), provider, categories, personalContext.trim() || undefined);
+      await onSimulate(title.trim(), effectiveApiKey.trim(), provider, categories, personalContext.trim() || undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Simulation failed");
@@ -422,28 +431,57 @@ function NewSimulationModal({
 
         {/* API key */}
         <div className="mb-4 glass rounded-xl p-4 space-y-3 border border-border-subtle">
-          <div className="flex items-center gap-2 text-xs text-text-muted">
-            <Key className="w-3.5 h-3.5" />
-            <span>AI provider &amp; key</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-text-muted">
+              <Key className="w-3.5 h-3.5" />
+              <span>AI provider &amp; key</span>
+            </div>
+            {hasSavedKeys && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUseSavedKey(!useSavedKey);
+                  if (!useSavedKey) {
+                    setApiKey("__profile__");
+                    setProvider(initialSavedProvider);
+                  } else {
+                    setApiKey("");
+                  }
+                }}
+                className={`text-xs px-2 py-1 rounded-lg border transition-all duration-150 ${
+                  useSavedKey
+                    ? "border-oracle-700/60 bg-oracle-500/10 text-oracle-400"
+                    : "border-border text-text-muted hover:text-text-secondary hover:border-border-bright"
+                }`}
+              >
+                {useSavedKey ? `Using saved ${initialSavedProvider} key` : "Use saved key"}
+              </button>
+            )}
           </div>
-          <div className="flex gap-2">
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="bg-void-800/60 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-oracle-700 transition-colors"
-            >
-              <option value="claude">Claude</option>
-              <option value="openai">OpenAI</option>
-              <option value="custom">Custom</option>
-            </select>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-ant-api03-…"
-              className="flex-1 bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 font-mono"
-            />
-          </div>
+          {useSavedKey ? (
+            <p className="text-xs text-oracle-400/80 bg-oracle-900/20 border border-oracle-800/30 rounded-lg px-3 py-2">
+              Your saved {initialSavedProvider} key from Profile will be used automatically.
+            </p>
+          ) : (
+            <div className="flex gap-2">
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as "claude" | "openai" | "custom")}
+                className="bg-void-800/60 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none focus:border-oracle-700 transition-colors"
+              >
+                <option value="claude">Claude</option>
+                <option value="openai">OpenAI</option>
+                <option value="custom">Custom</option>
+              </select>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-ant-api03-…"
+                className="flex-1 bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200 font-mono"
+              />
+            </div>
+          )}
           <p className="text-xs text-text-ghost">
             Save your key in{" "}
             <a href="/profile" className="text-oracle-500 hover:underline">Profile → AI Keys</a>{" "}
@@ -455,7 +493,7 @@ function NewSimulationModal({
 
         <button
           onClick={handle}
-          disabled={!title.trim() || !apiKey.trim() || generating}
+          disabled={!title.trim() || (!useSavedKey && !apiKey.trim()) || generating}
           className="w-full flex items-center justify-center gap-2 bg-oracle-500 hover:bg-oracle-400 disabled:opacity-50 disabled:cursor-not-allowed text-void-950 font-semibold py-3 rounded-xl transition-all duration-200 hover:shadow-[0_0_24px_oklch(72%_0.175_76_/_0.5)] text-sm"
         >
           {generating ? (
@@ -486,6 +524,11 @@ export default function DashboardPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [lastApiKey, setLastApiKey] = useState("");
   const [lastProvider, setLastProvider] = useState<"claude" | "openai" | "custom">("claude");
+  const [hasSavedKeys, setHasSavedKeys] = useState(false);
+  const [savedProvider, setSavedProvider] = useState<"claude" | "openai" | "custom">("claude");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Client-side auth guard
   useEffect(() => {
@@ -505,6 +548,21 @@ export default function DashboardPage() {
         // else keep DEMO_SIMULATIONS
       })
       .catch(() => {}); // keep demo on error
+
+    // Pre-populate provider from saved profile keys
+    fetch("/api/profile/keys")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((keys: Array<{ provider: string; maskedKey: string }>) => {
+        if (keys.length > 0) {
+          setHasSavedKeys(true);
+          const preferred =
+            keys.find((k) => k.provider === "claude") ??
+            keys.find((k) => k.provider === "openai") ??
+            keys[0];
+          setSavedProvider(preferred.provider as "claude" | "openai" | "custom");
+        }
+      })
+      .catch(() => {});
   }, [session]);
 
   // Load tree for the active simulation when it changes
@@ -616,6 +674,27 @@ export default function DashboardPage() {
     [session, oracle, lastApiKey, lastProvider]
   );
 
+  const commitRename = useCallback(async (id: string) => {
+    if (!renameValue.trim()) { setRenamingId(null); return; }
+    setRenamingId(null);
+    setSimulations((prev) => prev.map((s) => s.id === id ? { ...s, title: renameValue.trim() } : s));
+    await fetch(`/api/simulations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: renameValue.trim() }),
+    }).catch(() => {});
+  }, [renameValue]);
+
+  const handleDeleteSim = useCallback(async (id: string) => {
+    setDeletingId(null);
+    setSimulations((prev) => prev.filter((s) => s.id !== id));
+    if (activeSimId === id) {
+      const remaining = simulations.filter((s) => s.id !== id);
+      setActiveSimId(remaining[0]?.id ?? null);
+    }
+    await fetch(`/api/simulations/${id}`, { method: "DELETE" }).catch(() => {});
+  }, [simulations, activeSimId]);
+
   if (sessionLoading) {
     return (
       <div className="h-screen bg-void-950 flex items-center justify-center">
@@ -657,17 +736,18 @@ export default function DashboardPage() {
               const cats = (sim.categories ?? ["career"]) as SimulationCategory[];
               const isCombo = cats.length > 1;
               return (
-                <button
+                <div
                   key={sim.id}
-                  onClick={() => {
-                    setActiveSimId(sim.id);
-                    setSelectedNodeId(null);
-                  }}
-                  className={`w-full text-left px-3 py-3 rounded-xl transition-all duration-150 group ${
+                  className={`w-full text-left px-3 py-3 rounded-xl transition-all duration-150 group cursor-pointer ${
                     activeSimId === sim.id
                       ? "bg-oracle-900/40 border border-oracle-800/50 text-text-primary"
                       : "hover:bg-void-800/60 text-text-secondary hover:text-text-primary"
                   }`}
+                  onClick={() => {
+                    if (renamingId === sim.id) return;
+                    setActiveSimId(sim.id);
+                    setSelectedNodeId(null);
+                  }}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
                     <GitBranch className={`w-3.5 h-3.5 shrink-0 ${activeSimId === sim.id ? "text-oracle-500" : "text-text-muted"}`} />
@@ -703,7 +783,58 @@ export default function DashboardPage() {
                       {sim.createdAt}
                     </span>
                   </div>
-                </button>
+                  {/* Inline rename / delete actions */}
+                  <div
+                    className="pl-5 flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {renamingId === sim.id ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitRename(sim.id);
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        onBlur={() => commitRename(sim.id)}
+                        className="text-xs bg-void-800 border border-oracle-700/60 rounded px-2 py-0.5 text-text-primary outline-none w-full"
+                      />
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setRenamingId(sim.id); setRenameValue(sim.title); }}
+                          className="p-1 rounded text-text-ghost hover:text-oracle-400 transition-colors"
+                          title="Rename"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeletingId(deletingId === sim.id ? null : sim.id); }}
+                          className="p-1 rounded text-text-ghost hover:text-hazard-400 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <AnimatePresence>
+                    {deletingId === sim.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="pl-5 flex items-center gap-2 py-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-xs text-hazard-400">Delete?</span>
+                        <button onClick={() => handleDeleteSim(sim.id)} className="text-xs text-hazard-400 hover:text-hazard-300 font-medium">Yes</button>
+                        <button onClick={() => setDeletingId(null)} className="text-xs text-text-muted hover:text-text-secondary">Cancel</button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               );
             })}
 
@@ -868,6 +999,8 @@ export default function DashboardPage() {
           <NewSimulationModal
             onClose={() => setShowNewModal(false)}
             onSimulate={handleSimulate}
+            hasSavedKeys={hasSavedKeys}
+            savedProvider={savedProvider}
           />
         )}
       </AnimatePresence>
