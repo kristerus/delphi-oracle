@@ -367,7 +367,7 @@ export async function POST(req: NextRequest) {
       {
         headers: {
           "X-RateLimit-Remaining": String(rl.remaining),
-          "X-RateLimit-Reset": String(Math.ceil(rl.resetAt / 1_000)),
+          "X-RateLimit-Reset": String(Math.ceil(rl.resetAt.getTime() / 1_000)),
         },
       }
     );
