@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       encryptedKey,
       label: (body.label as string) ?? null,
     })
-    .returning({ id: apiKeys.id });
+    .returning();
 
   return NextResponse.json({ id: inserted.id, provider: body.provider });
 }

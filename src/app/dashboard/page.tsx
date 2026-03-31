@@ -27,6 +27,7 @@ import Navbar from "@/components/layout/Navbar";
 import { DEMO_SIMULATION } from "@/lib/ai/types";
 import { authClient } from "@/lib/auth-client";
 import { useOracle } from "@/hooks/useOracle";
+import { useAutoScrape } from "@/hooks/useAutoScrape";
 import type { SimulationTree, FutureTreeNode, FutureTreeEdge, Granularity, SimulationCategory } from "@/lib/ai/types";
 
 const FutureTree = dynamic(() => import("@/components/tree/FutureTree"), {
@@ -553,6 +554,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { data: session, isPending: sessionLoading } = authClient.useSession();
   const oracle = useOracle();
+  useAutoScrape();
 
   const [activeSimId, setActiveSimId] = useState<string>("demo-1");
   const [simulations, setSimulations] = useState<SimulationMeta[]>(DEMO_SIMULATIONS);

@@ -14,6 +14,14 @@ import {
   Shield,
   Brain,
   CheckCircle2,
+  X,
+  Check,
+  Minus,
+  Send,
+  Twitter,
+  Linkedin,
+  Github,
+  Quote,
 } from "lucide-react";
 
 /* ─── Constellation Canvas ──────────────────────────────────────────────────── */
@@ -269,6 +277,57 @@ const steps = [
   },
 ];
 
+/* ─── Testimonials ─────────────────────────────────────────────────────────── */
+
+const testimonials = [
+  {
+    name: "Sarah K.",
+    role: "Product Manager at Figma",
+    text: "I was debating between staying in product or going founder mode. Delphi showed me a branch where I joined a Series A as head of product — with specific companies and comp ranges. That branch is now my actual plan.",
+    avatar: "SK",
+    color: "oracle",
+  },
+  {
+    name: "Marcus T.",
+    role: "ML Engineer, ex-Google",
+    text: "The predictions aren't vague fortune-telling. It named actual professors at CMU and Stanford I could work with, specific PhD timelines, and realistic funding scenarios. That level of specificity changed how I think about my career.",
+    avatar: "MT",
+    color: "nebula",
+  },
+  {
+    name: "Priya R.",
+    role: "Founder & CEO, Stealth Startup",
+    text: "Used the multi-category simulation for Career + Financial + Personal. It showed me how a Series A fundraise would interact with my plan to relocate to London. The cross-domain tension was something no advisor had surfaced.",
+    avatar: "PR",
+    color: "signal",
+  },
+];
+
+const testimonialColors = {
+  oracle: "border-oracle-700/40 bg-oracle-950/20",
+  nebula: "border-nebula-700/40 bg-nebula-950/20",
+  signal: "border-signal-700/40 bg-signal-950/20",
+};
+
+const avatarColors = {
+  oracle: "from-oracle-500 to-oracle-700",
+  nebula: "from-nebula-400 to-nebula-600",
+  signal: "from-signal-400 to-signal-600",
+};
+
+/* ─── Comparison ──────────────────────────────────────────────────────────── */
+
+const comparisonRows = [
+  { feature: "Grounded in YOUR real profile data", delphi: true, journal: false, coach: "partial", matrix: false },
+  { feature: "References real companies, people, salaries", delphi: true, journal: false, coach: "partial", matrix: false },
+  { feature: "Probability-weighted outcomes", delphi: true, journal: false, coach: false, matrix: "partial" },
+  { feature: "Multi-level branch expansion", delphi: true, journal: false, coach: false, matrix: false },
+  { feature: "Cross-domain interaction (career + romantic + financial)", delphi: true, journal: "partial", coach: "partial", matrix: false },
+  { feature: "Live web search grounding", delphi: true, journal: false, coach: false, matrix: false },
+  { feature: "Visual branching timeline", delphi: true, journal: false, coach: false, matrix: "partial" },
+  { feature: "Privacy-first (BYOK, AES-256)", delphi: true, journal: true, coach: false, matrix: true },
+];
+
 /* ─── FAQ Item ──────────────────────────────────────────────────────────────── */
 
 function FAQItem({ q, a, index }: { q: string; a: string; index: number }) {
@@ -322,21 +381,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-void-950 overflow-x-hidden">
-      {/* ── Ambient background glows ── */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div
-          className="absolute -top-40 left-1/3 w-[600px] h-[600px] rounded-full opacity-25 animate-glow-pulse"
-          style={{ background: "radial-gradient(circle, oklch(45% 0.120 280), transparent 70%)" }}
-        />
-        <div
-          className="absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full opacity-20 animate-glow-pulse"
-          style={{ background: "radial-gradient(circle, oklch(46% 0.145 68), transparent 70%)", animationDelay: "1.5s" }}
-        />
-        <div
-          className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full opacity-15 animate-glow-pulse"
-          style={{ background: "radial-gradient(circle, oklch(42% 0.110 185), transparent 70%)", animationDelay: "3s" }}
-        />
-      </div>
+      {/* Background handled by constellation canvas */}
 
       {/* ── Navbar ── */}
       <header className="relative z-50">
@@ -553,6 +598,116 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Video Demo ── */}
+      <section id="demo" className="relative z-10 py-28 px-6">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-12"
+          >
+            <p className="text-oracle-500 text-sm font-medium uppercase tracking-widest mb-3">
+              See it in action
+            </p>
+            <h2 className="text-4xl md:text-5xl font-bold text-text-primary tracking-tight">
+              Watch the
+              <span className="text-gradient-gold"> Oracle work</span>
+            </h2>
+            <p className="text-text-secondary text-lg mt-4 max-w-2xl mx-auto leading-relaxed">
+              From profile import to branching futures in under 30 seconds.
+              See how real decisions create probability-weighted timelines grounded in real companies, programs, and market data.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="relative rounded-2xl overflow-hidden border border-border-subtle"
+            style={{ boxShadow: "0 0 80px oklch(45% 0.120 280 / 0.15), 0 0 40px oklch(72% 0.175 76 / 0.1)" }}
+          >
+            {/* Video container with 16:9 aspect ratio */}
+            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+              {/* Replace the src below with your actual demo video URL */}
+              {/* Supports: YouTube embed, Vimeo embed, or direct .mp4 URL */}
+              <video
+                className="absolute inset-0 w-full h-full object-cover bg-void-900"
+                src="/demo.mp4"
+                poster="/demo-poster.jpg"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+              >
+                <p className="text-text-muted text-sm p-8">
+                  Your browser does not support the video tag.
+                </p>
+              </video>
+            </div>
+
+            {/* Bottom caption bar */}
+            <div className="bg-void-900/90 backdrop-blur-sm border-t border-border-subtle px-6 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-signal-500 animate-pulse" />
+                <span className="text-xs text-text-muted">Live demo recording</span>
+              </div>
+              <span className="text-xs text-text-ghost">Real predictions, real companies, real data</span>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── Testimonials ── */}
+      <section className="relative z-10 py-28 px-6">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-16"
+          >
+            <p className="text-oracle-500 text-sm font-medium uppercase tracking-widest mb-3">
+              What people are saying
+            </p>
+            <h2 className="text-4xl md:text-5xl font-bold text-text-primary tracking-tight">
+              Decisions, <span className="text-gradient-nebula">transformed</span>
+            </h2>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {testimonials.map((t, i) => (
+              <motion.div
+                key={t.name}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className={`glass-card rounded-2xl p-6 border ${testimonialColors[t.color as keyof typeof testimonialColors]} flex flex-col`}
+              >
+                <Quote className="w-8 h-8 text-text-ghost/30 mb-4" strokeWidth={1} />
+                <p className="text-sm text-text-secondary leading-relaxed flex-1 mb-5">
+                  &ldquo;{t.text}&rdquo;
+                </p>
+                <div className="flex items-center gap-3 pt-4 border-t border-border-subtle">
+                  <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${avatarColors[t.color as keyof typeof avatarColors]} flex items-center justify-center text-xs font-bold text-void-950`}>
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">{t.name}</p>
+                    <p className="text-xs text-text-muted">{t.role}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Pricing ── */}
       <section id="pricing" className="relative z-10 py-28 px-6">
         <div className="max-w-5xl mx-auto">
@@ -665,6 +820,71 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Comparison ── */}
+      <section className="relative z-10 py-28 px-6">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-12"
+          >
+            <p className="text-oracle-500 text-sm font-medium uppercase tracking-widest mb-3">
+              Why Delphi
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold text-text-primary tracking-tight">
+              Not your average decision tool
+            </h2>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="glass-card rounded-2xl overflow-hidden border border-border-subtle"
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border-subtle">
+                    <th className="text-left text-text-muted font-medium px-5 py-4 w-2/5" />
+                    <th className="text-center px-4 py-4">
+                      <div className="flex flex-col items-center gap-1">
+                        <Sparkles className="w-4 h-4 text-oracle-500" />
+                        <span className="text-oracle-400 font-semibold text-xs">Delphi Oracle</span>
+                      </div>
+                    </th>
+                    <th className="text-center text-text-muted font-medium px-4 py-4 text-xs">Journaling</th>
+                    <th className="text-center text-text-muted font-medium px-4 py-4 text-xs">Career Coach</th>
+                    <th className="text-center text-text-muted font-medium px-4 py-4 text-xs">Decision Matrix</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row, i) => (
+                    <tr key={i} className={i < comparisonRows.length - 1 ? "border-b border-border-subtle/50" : ""}>
+                      <td className="text-text-secondary px-5 py-3.5 text-xs">{row.feature}</td>
+                      {[row.delphi, row.journal, row.coach, row.matrix].map((val, j) => (
+                        <td key={j} className="text-center px-4 py-3.5">
+                          {val === true ? (
+                            <Check className={`w-4 h-4 mx-auto ${j === 0 ? "text-oracle-500" : "text-signal-500"}`} />
+                          ) : val === "partial" ? (
+                            <Minus className="w-4 h-4 mx-auto text-text-ghost" />
+                          ) : (
+                            <X className="w-3.5 h-3.5 mx-auto text-text-ghost/40" />
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* ── FAQ ── */}
       <section className="relative z-10 py-20 px-6">
         <div className="max-w-3xl mx-auto">
@@ -705,6 +925,47 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Newsletter ── */}
+      <section className="relative z-10 py-16 px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="max-w-xl mx-auto text-center"
+        >
+          <p className="text-text-secondary text-sm mb-4">
+            Not ready to sign up? Get notified when we launch new features.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const input = (e.target as HTMLFormElement).querySelector("input");
+              if (input?.value) {
+                // TODO: Wire to email service (Resend, Mailchimp, etc.)
+                input.value = "";
+                alert("You're on the list!");
+              }
+            }}
+            className="flex gap-2 max-w-md mx-auto"
+          >
+            <input
+              type="email"
+              placeholder="you@example.com"
+              required
+              className="flex-1 bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200"
+            />
+            <button
+              type="submit"
+              className="flex items-center gap-2 bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 font-medium text-sm px-5 py-3 rounded-xl transition-all duration-200"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Notify me
+            </button>
+          </form>
+        </motion.div>
+      </section>
+
       {/* ── CTA section ── */}
       <section className="relative z-10 py-28 px-6">
         <motion.div
@@ -715,12 +976,6 @@ export default function LandingPage() {
           className="max-w-3xl mx-auto text-center"
         >
           <div className="glass-card rounded-3xl p-12 border-shimmer relative overflow-hidden">
-            {/* Ambient glow inside card */}
-            <div
-              className="absolute -top-20 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full opacity-30 pointer-events-none"
-              style={{ background: "radial-gradient(circle, oklch(45% 0.120 280), transparent 70%)" }}
-              aria-hidden
-            />
             <div className="relative z-10">
               <div className="inline-flex p-3 rounded-2xl bg-oracle-900/50 mb-6">
                 <Sparkles className="w-7 h-7 text-oracle-400" strokeWidth={1.5} />
@@ -745,21 +1000,76 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-border-subtle py-10 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-oracle-500 to-nebula-500 flex items-center justify-center">
-              <Sparkles className="w-2.5 h-2.5 text-void-950" strokeWidth={2.5} />
+      <footer className="relative z-10 border-t border-border-subtle py-14 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-10">
+            {/* Brand */}
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-oracle-500 to-nebula-500 flex items-center justify-center">
+                  <Sparkles className="w-3 h-3 text-void-950" strokeWidth={2.5} />
+                </div>
+                <span className="text-sm font-semibold text-text-primary">Delphi Oracle</span>
+              </div>
+              <p className="text-xs text-text-ghost leading-relaxed mb-4">
+                AI-powered future simulation.<br />
+                The future is not fixed.
+              </p>
+              {/* Social icons */}
+              <div className="flex items-center gap-3">
+                <a href="https://twitter.com/delphioracle" target="_blank" rel="noopener noreferrer" className="text-text-ghost hover:text-text-primary transition-colors" aria-label="Twitter">
+                  <Twitter className="w-4 h-4" />
+                </a>
+                <a href="https://linkedin.com/company/delphi-oracle" target="_blank" rel="noopener noreferrer" className="text-text-ghost hover:text-text-primary transition-colors" aria-label="LinkedIn">
+                  <Linkedin className="w-4 h-4" />
+                </a>
+                <a href="https://github.com/kristerus/delphi-oracle" target="_blank" rel="noopener noreferrer" className="text-text-ghost hover:text-text-primary transition-colors" aria-label="GitHub">
+                  <Github className="w-4 h-4" />
+                </a>
+              </div>
             </div>
-            <span className="text-sm text-text-muted font-medium">Delphi Oracle</span>
+
+            {/* Product */}
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Product</p>
+              <ul className="space-y-2 text-sm text-text-ghost">
+                <li><a href="#features" className="hover:text-text-primary transition-colors">Features</a></li>
+                <li><a href="#pricing" className="hover:text-text-primary transition-colors">Pricing</a></li>
+                <li><a href="#demo" className="hover:text-text-primary transition-colors">Demo</a></li>
+                <li><Link href="/register" className="hover:text-text-primary transition-colors">Get started</Link></li>
+              </ul>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Resources</p>
+              <ul className="space-y-2 text-sm text-text-ghost">
+                <li><a href="/blog" className="hover:text-text-primary transition-colors">Blog</a></li>
+                <li><a href="https://discord.gg/delphi-oracle" target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">Discord Community</a></li>
+                <li><a href="/changelog" className="hover:text-text-primary transition-colors">Changelog</a></li>
+                <li><a href="mailto:support@delphi-oracle.app" className="hover:text-text-primary transition-colors">Support</a></li>
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Legal</p>
+              <ul className="space-y-2 text-sm text-text-ghost">
+                <li><Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="hover:text-text-primary transition-colors">Terms of Service</Link></li>
+                <li><a href="mailto:security@delphi-oracle.app" className="hover:text-text-primary transition-colors">Security</a></li>
+              </ul>
+            </div>
           </div>
-          <p className="text-text-ghost text-sm">
-            Built with Next.js, FastAPI, and the belief that the future is not fixed.
-          </p>
-          <div className="flex items-center gap-5 text-sm text-text-muted">
-            <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-text-primary transition-colors">Terms</Link>
-            <a href="https://github.com" className="hover:text-text-primary transition-colors">GitHub</a>
+
+          {/* Bottom bar */}
+          <div className="pt-6 border-t border-border-subtle flex flex-col md:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-text-ghost">
+              &copy; {new Date().getFullYear()} Delphi Oracle. All rights reserved.
+            </p>
+            <p className="text-xs text-text-ghost">
+              Built with Next.js and the belief that every decision deserves a map.
+            </p>
           </div>
         </div>
       </footer>

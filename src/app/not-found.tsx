@@ -106,18 +106,6 @@ export default function NotFound() {
     <div className="min-h-screen bg-void-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <ConstellationCanvas />
 
-      {/* Ambient glows */}
-      <div className="fixed inset-0 pointer-events-none" aria-hidden>
-        <div
-          className="absolute top-1/3 left-1/4 w-[500px] h-[500px] rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, oklch(45% 0.120 280), transparent 70%)" }}
-        />
-        <div
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, oklch(46% 0.145 68), transparent 70%)" }}
-        />
-      </div>
-
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}

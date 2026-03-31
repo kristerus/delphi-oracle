@@ -37,7 +37,7 @@ export async function checkRateLimit(
         updatedAt: now,
       },
     })
-    .returning({ count: rateLimits.count });
+    .returning();
 
   const count = result[0]?.count ?? 1;
   const allowed = count <= max;

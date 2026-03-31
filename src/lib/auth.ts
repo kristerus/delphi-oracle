@@ -61,6 +61,7 @@ export const auth = betterAuth({
       // Handle env var with/without protocol
       `https://${base.replace(/^https?:\/\//, "")}`,
       "http://localhost:3000",
+      "http://localhost:3001",
     ];
   },
 });

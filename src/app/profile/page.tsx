@@ -10,6 +10,7 @@ import Navbar from "@/components/layout/Navbar";
 import DataInputForm from "@/components/profile/DataInputForm";
 import DigitalFootprint from "@/components/profile/DigitalFootprint";
 import { authClient } from "@/lib/auth-client";
+import { useAutoScrape } from "@/hooks/useAutoScrape";
 
 type Tab = "manual" | "scraped" | "keys";
 
@@ -170,6 +171,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const [activeTab, setActiveTab] = useState<Tab>("manual");
+  useAutoScrape();
 
   // Client-side auth guard
   useEffect(() => {
