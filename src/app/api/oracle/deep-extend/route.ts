@@ -169,16 +169,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const rl = checkRateLimit(session.user.id, "extend");
+    const rl = await checkRateLimit(session.user.id, "extend");
     if (!rl.allowed) {
+      const retryAfterSeconds = Math.ceil((rl.resetAt.getTime() - Date.now()) / 1_000);
       return NextResponse.json(
         { error: "Too many requests. Please wait before trying again." },
         {
           status: 429,
           headers: {
-            "Retry-After": String(rl.retryAfterSeconds),
+            "Retry-After": String(retryAfterSeconds),
             "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(Math.ceil(rl.resetAt / 1_000)),
+            "X-RateLimit-Reset": String(Math.ceil(rl.resetAt.getTime() / 1_000)),
           },
         }
       );

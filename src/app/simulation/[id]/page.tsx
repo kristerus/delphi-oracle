@@ -645,15 +645,9 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
       success("Link copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      const el = document.createElement("input");
-      el.value = window.location.href;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-      setCopied(true);
-      success("Link copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
+      // Clipboard API unavailable — show the URL for manual copy
+      setExtendError(`Share URL: ${window.location.href}`);
+      setTimeout(() => setExtendError(null), 8000);
     }
   };
 

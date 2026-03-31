@@ -149,7 +149,7 @@ export const rateLimits = pgTable("rate_limits", {
   action: text("action").notNull(), // "simulate" | "extend" | "scrape"
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
   count: integer("count").notNull().default(0),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().$onUpdate(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().$onUpdateFn(() => new Date()),
 }, (t) => [
   unique("rate_limits_user_action_window").on(t.userId, t.action, t.windowStart),
 ]);
