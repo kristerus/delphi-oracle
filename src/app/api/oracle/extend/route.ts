@@ -31,17 +31,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Rate limit
-    const rl = checkRateLimit(session.user.id, "extend");
+    const rl = await checkRateLimit(session.user.id, "extend");
     if (!rl.allowed) {
       logger.warn("Rate limit exceeded", { userId: session.user.id, action: "extend" });
+      const retryAfterSeconds = Math.ceil((rl.resetAt.getTime() - Date.now()) / 1_000);
       return NextResponse.json(
-        { error: "Too many requests. Please wait before trying again." },
+        { error: "Too many requests. Please wait before trying again.", remaining: 0 },
         {
           status: 429,
           headers: {
-            "Retry-After": String(rl.retryAfterSeconds),
+            "Retry-After": String(retryAfterSeconds),
             "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(Math.ceil(rl.resetAt / 1_000)),
+            "X-RateLimit-Reset": String(Math.ceil(rl.resetAt.getTime() / 1_000)),
           },
         }
       );
@@ -200,7 +201,7 @@ export async function POST(req: NextRequest) {
       {
         headers: {
           "X-RateLimit-Remaining": String(rl.remaining),
-          "X-RateLimit-Reset": String(Math.ceil(rl.resetAt / 1_000)),
+          "X-RateLimit-Reset": String(Math.ceil(rl.resetAt.getTime() / 1_000)),
         },
       }
     );

@@ -143,16 +143,17 @@ export async function POST(req: NextRequest) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const rl = checkRateLimit(session.user.id, "scrape");
+    const rl = await checkRateLimit(session.user.id, "scrape");
     if (!rl.allowed) {
+      const retryAfterSeconds = Math.ceil((rl.resetAt.getTime() - Date.now()) / 1_000);
       return NextResponse.json(
-        { error: "Daily scrape limit reached. Try again tomorrow." },
+        { error: "Daily scrape limit reached. Try again tomorrow.", remaining: 0 },
         {
           status: 429,
           headers: {
-            "Retry-After": String(rl.retryAfterSeconds),
+            "Retry-After": String(retryAfterSeconds),
             "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(Math.ceil(rl.resetAt / 1_000)),
+            "X-RateLimit-Reset": String(Math.ceil(rl.resetAt.getTime() / 1_000)),
           },
         }
       );

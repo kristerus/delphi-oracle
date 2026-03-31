@@ -1,68 +1,68 @@
-/**
- * In-memory rate limiter for AI API routes.
- * Upgrade path: replace `store` with an ioredis/upstash-redis client.
- */
+import { db } from "@/lib/db";
+import { rateLimits } from "@/lib/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 
-export type RateLimitAction = "simulate" | "extend" | "scrape";
+export const LIMITS = {
+  simulate: { max: 10, windowMs: 60 * 60 * 1000 },   // 10/hr
+  extend:   { max: 30, windowMs: 60 * 60 * 1000 },   // 30/hr
+  scrape:   { max: 5,  windowMs: 24 * 60 * 60 * 1000 }, // 5/day
+} as const;
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number; // epoch ms
-}
+export type RateLimitAction = keyof typeof LIMITS;
 
-const LIMITS: Record<RateLimitAction, { max: number; windowMs: number }> = {
-  simulate: { max: 10, windowMs: 60 * 60 * 1_000 },        // 10 / hour
-  extend:   { max: 30, windowMs: 60 * 60 * 1_000 },        // 30 / hour
-  scrape:   { max: 5,  windowMs: 24 * 60 * 60 * 1_000 },   // 5  / day
-};
-
-// In-process store — shared across requests within the same server instance.
-// key = `${userId}:${action}`
-const store = new Map<string, RateLimitEntry>();
-
-export interface RateLimitResult {
-  allowed: boolean;
-  remaining: number;
-  resetAt: number;
-  retryAfterSeconds: number;
-}
-
-export function checkRateLimit(
+export async function checkRateLimit(
   userId: string,
   action: RateLimitAction
-): RateLimitResult {
-  const key = `${userId}:${action}`;
-  const limit = LIMITS[action];
-  const now = Date.now();
+): Promise<{ allowed: boolean; remaining: number; resetAt: Date }> {
+  const { max, windowMs } = LIMITS[action];
+  const now = new Date();
+  // Truncate to window start
+  const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
+  const resetAt = new Date(windowStart.getTime() + windowMs);
 
-  let entry = store.get(key);
-  if (!entry || entry.resetAt <= now) {
-    entry = { count: 0, resetAt: now + limit.windowMs };
-    store.set(key, entry);
-  }
+  // Upsert: increment count if row exists for this window, else insert with count=1
+  const result = await db
+    .insert(rateLimits)
+    .values({
+      userId,
+      action,
+      windowStart,
+      count: 1,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [rateLimits.userId, rateLimits.action, rateLimits.windowStart],
+      set: {
+        count: sql`${rateLimits.count} + 1`,
+        updatedAt: now,
+      },
+    })
+    .returning({ count: rateLimits.count });
 
-  if (entry.count >= limit.max) {
-    return {
-      allowed: false,
-      remaining: 0,
-      resetAt: entry.resetAt,
-      retryAfterSeconds: Math.ceil((entry.resetAt - now) / 1_000),
-    };
-  }
+  const count = result[0]?.count ?? 1;
+  const allowed = count <= max;
+  const remaining = Math.max(0, max - count);
 
-  entry.count += 1;
-  return {
-    allowed: true,
-    remaining: limit.max - entry.count,
-    resetAt: entry.resetAt,
-    retryAfterSeconds: 0,
-  };
+  return { allowed, remaining, resetAt };
 }
 
-/** Call periodically (e.g. via a setInterval) to avoid unbounded memory growth. */
-export function purgeExpiredEntries(): void {
-  const now = Date.now();
-  for (const [key, entry] of store) {
-    if (entry.resetAt <= now) store.delete(key);
-  }
+export async function getRateLimitStatus(
+  userId: string,
+  action: RateLimitAction
+): Promise<{ used: number; max: number; remaining: number; resetAt: Date }> {
+  const { max, windowMs } = LIMITS[action];
+  const now = new Date();
+  const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
+  const resetAt = new Date(windowStart.getTime() + windowMs);
+
+  const row = await db.query.rateLimits.findFirst({
+    where: and(
+      eq(rateLimits.userId, userId),
+      eq(rateLimits.action, action),
+      eq(rateLimits.windowStart, windowStart)
+    ),
+  });
+
+  const used = row?.count ?? 0;
+  return { used, max, remaining: Math.max(0, max - used), resetAt };
 }

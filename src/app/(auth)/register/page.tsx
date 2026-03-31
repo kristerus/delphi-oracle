@@ -59,6 +59,8 @@ export default function RegisterPage() {
       if (authError) {
         setError(authError.message ?? "Registration failed. Please try again.");
       } else {
+        // Fire-and-forget welcome email
+        fetch("/api/auth/welcome", { method: "POST" }).catch(() => {});
         router.push("/profile");
       }
     } catch {

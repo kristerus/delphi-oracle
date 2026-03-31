@@ -8,6 +8,7 @@ import {
   real,
   integer,
   primaryKey,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -141,6 +142,17 @@ export const apiKeys = pgTable("api_keys", {
   lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const rateLimits = pgTable("rate_limits", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull(),
+  action: text("action").notNull(), // "simulate" | "extend" | "scrape"
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().$onUpdate(() => new Date()),
+}, (t) => [
+  unique("rate_limits_user_action_window").on(t.userId, t.action, t.windowStart),
+]);
 
 /* ─── Relations ─────────────────────────────────────────────────────────────── */
 

@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import Script from "next/script";
 import "@/styles/globals.css";
 import { ToastProvider } from "@/components/ui/Toaster";
+import { CookieBanner } from "@/components/ui/CookieBanner";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://delphi-oracle.app";
 const OG_IMAGE = `${APP_URL}/og-image.png`;
@@ -114,6 +115,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <ToastProvider>{children}</ToastProvider>
+        <CookieBanner />
       </body>
     </html>
   );

@@ -103,6 +103,42 @@ export function passwordResetEmail(url: string): string {
 </html>`;
 }
 
+export function welcomeEmail(name: string): { subject: string; html: string } {
+  return {
+    subject: "Welcome to Delphi Oracle \u2726",
+    html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0a0a0f;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;padding:40px 32px;background:#0f0f1a;border:1px solid #1e1e3a;border-radius:12px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <span style="font-size:32px;">\u2726</span>
+      <h1 style="color:#c9a84c;font-size:22px;margin:8px 0 0;letter-spacing:0.05em;">DELPHI ORACLE</h1>
+    </div>
+    <h2 style="color:#e8e8f0;font-size:20px;margin:0 0 16px;">Welcome, ${name} \u2726</h2>
+    <p style="color:#9999b8;line-height:1.6;margin:0 0 16px;">
+      Your oracle is ready. You can now run AI-powered future simulations across career, relationships, finance, health, and more.
+    </p>
+    <p style="color:#9999b8;line-height:1.6;margin:0 0 24px;">
+      Start by creating your first simulation from your dashboard. The oracle sees all possible branches \u2014 explore them.
+    </p>
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="background:#c9a84c;color:#0a0a0f;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block;">
+        Open Your Dashboard \u2192
+      </a>
+    </div>
+    <hr style="border:none;border-top:1px solid #1e1e3a;margin:32px 0;">
+    <p style="color:#555577;font-size:12px;text-align:center;margin:0;">
+      Delphi Oracle \u00b7 AI Future Simulator<br>
+      <a href="${process.env.NEXT_PUBLIC_APP_URL}/settings" style="color:#555577;">Manage notifications</a>
+    </p>
+  </div>
+</body>
+</html>`,
+  };
+}
+
 export function emailVerificationEmail(url: string): string {
   return `<!DOCTYPE html>
 <html>
