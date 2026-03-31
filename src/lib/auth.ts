@@ -20,17 +20,33 @@ export const auth = betterAuth({
       });
     },
   },
-  // Only enable GitHub OAuth when credentials are present
-  ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
-    ? {
-        socialProviders: {
+  // Social OAuth — each provider only enabled when credentials are present
+  socialProviders: {
+    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
+      ? {
           github: {
             clientId: process.env.GITHUB_CLIENT_ID,
             clientSecret: process.env.GITHUB_CLIENT_SECRET,
           },
-        },
-      }
-    : {}),
+        }
+      : {}),
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          },
+        }
+      : {}),
+    ...(process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET
+      ? {
+          linkedin: {
+            clientId: process.env.LINKEDIN_CLIENT_ID,
+            clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+          },
+        }
+      : {}),
+  },
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
