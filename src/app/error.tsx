@@ -18,14 +18,6 @@ export default function GlobalError({ error, reset }: ErrorProps) {
 
   return (
     <div className="min-h-screen bg-void-950 flex items-center justify-center p-6">
-      {/* Ambient */}
-      <div className="fixed inset-0 pointer-events-none" aria-hidden>
-        <div
-          className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full opacity-8"
-          style={{ background: "radial-gradient(circle, oklch(40% 0.130 20), transparent 65%)" }}
-        />
-      </div>
-
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

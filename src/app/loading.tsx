@@ -1,14 +1,6 @@
 export default function RootLoading() {
   return (
     <div className="min-h-screen bg-void-950 flex items-center justify-center">
-      {/* Ambient glow */}
-      <div className="fixed inset-0 pointer-events-none" aria-hidden>
-        <div
-          className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full opacity-8"
-          style={{ background: "radial-gradient(circle, oklch(45% 0.120 280), transparent 65%)" }}
-        />
-      </div>
-
       <div className="relative flex flex-col items-center gap-8">
         {/* Oracle eye pulse */}
         <div className="relative">

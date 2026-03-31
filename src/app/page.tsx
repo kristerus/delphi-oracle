@@ -381,21 +381,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-void-950 overflow-x-hidden">
-      {/* ── Ambient background glows ── */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div
-          className="absolute -top-40 left-1/3 w-[600px] h-[600px] rounded-full opacity-25 animate-glow-pulse"
-          style={{ background: "radial-gradient(circle, oklch(45% 0.120 280), transparent 70%)" }}
-        />
-        <div
-          className="absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full opacity-20 animate-glow-pulse"
-          style={{ background: "radial-gradient(circle, oklch(46% 0.145 68), transparent 70%)", animationDelay: "1.5s" }}
-        />
-        <div
-          className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full opacity-15 animate-glow-pulse"
-          style={{ background: "radial-gradient(circle, oklch(42% 0.110 185), transparent 70%)", animationDelay: "3s" }}
-        />
-      </div>
+      {/* Background handled by constellation canvas */}
 
       {/* ── Navbar ── */}
       <header className="relative z-50">
@@ -990,12 +976,6 @@ export default function LandingPage() {
           className="max-w-3xl mx-auto text-center"
         >
           <div className="glass-card rounded-3xl p-12 border-shimmer relative overflow-hidden">
-            {/* Ambient glow inside card */}
-            <div
-              className="absolute -top-20 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full opacity-30 pointer-events-none"
-              style={{ background: "radial-gradient(circle, oklch(45% 0.120 280), transparent 70%)" }}
-              aria-hidden
-            />
             <div className="relative z-10">
               <div className="inline-flex p-3 rounded-2xl bg-oracle-900/50 mb-6">
                 <Sparkles className="w-7 h-7 text-oracle-400" strokeWidth={1.5} />

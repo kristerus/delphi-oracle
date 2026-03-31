@@ -81,17 +81,6 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-void-950 flex items-center justify-center p-6">
-      {/* Ambient */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div
-          className="absolute top-1/4 right-1/3 w-96 h-96 rounded-full opacity-20"
-          style={{ background: "radial-gradient(circle, oklch(45% 0.120 280), transparent 70%)" }}
-        />
-        <div
-          className="absolute bottom-1/3 left-1/4 w-80 h-80 rounded-full opacity-15"
-          style={{ background: "radial-gradient(circle, oklch(46% 0.145 68), transparent 70%)" }}
-        />
-      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
