@@ -33,6 +33,7 @@ import {
 import { useToast } from "@/components/ui/Toaster";
 import FutureNode from "@/components/tree/FutureNode";
 import BranchEdge from "@/components/tree/BranchEdge";
+import { TreeContext } from "@/components/tree/tree-context";
 import CertaintyIndicator from "@/components/timeline/CertaintyIndicator";
 import DepthControls from "@/components/timeline/DepthControls";
 import { DEMO_SIMULATION } from "@/lib/ai/types";
@@ -419,11 +420,12 @@ function NodePanel({
 interface FlowInnerProps {
   nodes: FutureTreeNode[];
   edges: FutureTreeEdge[];
+  onExtend?: (nodeId: string, depth?: number, granularity?: Granularity) => Promise<void>;
   selectedNodeId: string | null;
   onNodeSelect: (id: string | null) => void;
 }
 
-function SimulationFlowInner({ nodes, edges, selectedNodeId, onNodeSelect }: FlowInnerProps) {
+function SimulationFlowInner({ nodes, edges, selectedNodeId, onNodeSelect, onExtend }: FlowInnerProps) {
   const { fitView } = useReactFlow();
   const styledNodes = nodes.map((n) => ({ ...n, selected: n.id === selectedNodeId }));
 
@@ -455,6 +457,7 @@ function SimulationFlowInner({ nodes, edges, selectedNodeId, onNodeSelect }: Flo
   }, [fitView, selectedNodeId, onNodeSelect]);
 
   return (
+    <TreeContext.Provider value={{ onExtend }}>
     <div className="w-full h-full">
       <ReactFlow
         nodes={styledNodes}
@@ -483,6 +486,7 @@ function SimulationFlowInner({ nodes, edges, selectedNodeId, onNodeSelect }: Flo
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
     </div>
+    </TreeContext.Provider>
   );
 }
 
@@ -769,6 +773,7 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
                 edges={edges}
                 selectedNodeId={selectedNodeId}
                 onNodeSelect={setSelectedNodeId}
+                onExtend={handleExtend}
               />
             </ReactFlowProvider>
           )}
