@@ -588,6 +588,16 @@ export default function DashboardPage() {
       ...prev,
       [oracle.simulationId!]: { nodes: oracle.nodes, edges: oracle.edges },
     }));
+    // Keep sidebar node count in sync
+    if (oracle.simulationId) {
+      setSimulations((prev) =>
+        prev.map((s) =>
+          s.id === oracle.simulationId
+            ? { ...s, nodeCount: oracle.nodes.length }
+            : s
+        )
+      );
+    }
   }, [oracle.simulationId, oracle.nodes, oracle.edges]);
 
   // Cmd+N / Ctrl+N keyboard shortcut to open new simulation modal

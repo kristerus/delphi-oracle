@@ -30,6 +30,7 @@ import {
   Key,
   AlertCircle,
 } from "lucide-react";
+import { useToast } from "@/components/ui/Toaster";
 import FutureNode from "@/components/tree/FutureNode";
 import BranchEdge from "@/components/tree/BranchEdge";
 import CertaintyIndicator from "@/components/timeline/CertaintyIndicator";
@@ -483,6 +484,8 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
   const [loadingTree, setLoadingTree] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const { success } = useToast();
+
   // ── UI state ──
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -620,7 +623,8 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      success("Link copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       const el = document.createElement("input");
       el.value = window.location.href;
@@ -629,7 +633,8 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
       document.execCommand("copy");
       document.body.removeChild(el);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      success("Link copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 

@@ -28,6 +28,8 @@ const requirements = [
   { label: "One number", test: (v: string) => /[0-9]/.test(v) },
 ];
 
+const githubEnabled = process.env.NEXT_PUBLIC_GITHUB_OAUTH_ENABLED === "true";
+
 export default function RegisterPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -109,14 +111,26 @@ export default function RegisterPage() {
 
         <div className="glass-card rounded-2xl p-7">
           {/* GitHub OAuth */}
-          <button
-            onClick={handleGithub}
-            disabled={githubLoading || loading}
-            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border hover:border-border-bright bg-void-800/50 hover:bg-void-700/50 text-text-primary font-medium text-sm transition-all duration-200 mb-6 disabled:opacity-50"
-          >
-            <Github className="w-4 h-4" />
-            {githubLoading ? "Redirecting…" : "Continue with GitHub"}
-          </button>
+          {githubEnabled ? (
+            <button
+              onClick={handleGithub}
+              disabled={githubLoading || loading}
+              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border hover:border-border-bright bg-void-800/50 hover:bg-void-700/50 text-text-primary font-medium text-sm transition-all duration-200 mb-6 disabled:opacity-50"
+            >
+              <Github className="w-4 h-4" />
+              {githubLoading ? "Redirecting…" : "Continue with GitHub"}
+            </button>
+          ) : (
+            <button
+              disabled
+              title="GitHub OAuth not configured"
+              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-border bg-void-800/50 text-text-primary font-medium text-sm mb-6 opacity-40 cursor-not-allowed"
+            >
+              <Github className="w-4 h-4" />
+              Continue with GitHub
+              <span className="text-xs ml-1 opacity-60">(not configured)</span>
+            </button>
+          )}
 
           <div className="flex items-center gap-3 mb-6">
             <div className="flex-1 h-px bg-border-subtle" />

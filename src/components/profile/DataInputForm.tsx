@@ -7,6 +7,38 @@ import { z } from "zod";
 import { Plus, Trash2, Save, Loader2, Briefcase, GraduationCap, Code2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+/* ─── Profile completeness ───────────────────────────────────────────────────── */
+
+interface CompletenessField {
+  label: string;
+  done: boolean;
+  weight: number;
+}
+
+function computeCompleteness(form: {
+  bio?: string;
+  location?: string;
+  skills?: string;
+  experience?: unknown[];
+  education?: unknown[];
+  linkedinUrl?: string;
+  githubUsername?: string;
+}): { pct: number; fields: CompletenessField[] } {
+  const skillList = form.skills
+    ? form.skills.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+  const fields: CompletenessField[] = [
+    { label: "Bio", done: !!form.bio?.trim(), weight: 20 },
+    { label: "Location", done: !!form.location?.trim(), weight: 10 },
+    { label: "Skills", done: skillList.length >= 3, weight: 25 },
+    { label: "Experience", done: (form.experience?.length ?? 0) >= 1, weight: 25 },
+    { label: "Education", done: (form.education?.length ?? 0) >= 1, weight: 10 },
+    { label: "Social link", done: !!(form.linkedinUrl?.trim() || form.githubUsername?.trim()), weight: 10 },
+  ];
+  const pct = fields.filter((f) => f.done).reduce((sum, f) => sum + f.weight, 0);
+  return { pct, fields };
+}
+
 const schema = z.object({
   bio: z.string().max(500).optional(),
   location: z.string().optional(),
@@ -48,6 +80,7 @@ export default function DataInputForm() {
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -140,6 +173,8 @@ export default function DataInputForm() {
     "w-full bg-void-800/60 border border-border hover:border-border-bright focus:border-oracle-700 focus:bg-void-800 rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-ghost outline-none transition-all duration-200";
   const labelClass = "block text-sm font-medium text-text-secondary mb-1.5";
 
+  const watchedValues = watch(["bio", "location", "skills", "experience", "education", "linkedinUrl", "githubUsername"]);
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-7 max-w-2xl">
       {loadError && (
@@ -147,6 +182,72 @@ export default function DataInputForm() {
           Could not load profile: {loadError}
         </div>
       )}
+
+      {/* Profile completeness */}
+      {(() => {
+        const { pct, fields } = computeCompleteness({
+          bio: watchedValues[0],
+          location: watchedValues[1],
+          skills: watchedValues[2],
+          experience: watchedValues[3],
+          education: watchedValues[4],
+          linkedinUrl: watchedValues[5],
+          githubUsername: watchedValues[6],
+        });
+        const incomplete = fields.filter((f) => !f.done);
+        if (pct === 100) return null;
+        return (
+          <div className="glass-card rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-semibold text-text-primary">Profile completeness</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {pct < 50
+                    ? "A fuller profile gives the Oracle much better predictions"
+                    : pct < 80
+                    ? "Getting there — add a few more details for sharper simulations"
+                    : "Almost done — complete your profile for best results"}
+                </p>
+              </div>
+              <span
+                className={`text-2xl font-bold tabular-nums ${
+                  pct < 50 ? "text-hazard-400" : pct < 80 ? "text-oracle-400" : "text-signal-400"
+                }`}
+              >
+                {pct}%
+              </span>
+            </div>
+            {/* Bar */}
+            <div className="h-1.5 bg-void-800 rounded-full overflow-hidden mb-3">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                className={`h-full rounded-full ${
+                  pct < 50
+                    ? "bg-hazard-500"
+                    : pct < 80
+                    ? "bg-oracle-500"
+                    : "bg-signal-500"
+                }`}
+              />
+            </div>
+            {/* Missing fields */}
+            {incomplete.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {incomplete.map((f) => (
+                  <span
+                    key={f.label}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-void-800/60 border border-border text-text-ghost"
+                  >
+                    + {f.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Bio & location */}
       <div className="glass-card rounded-xl p-5 space-y-4">

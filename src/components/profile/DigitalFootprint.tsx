@@ -223,6 +223,7 @@ export default function DigitalFootprint() {
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [remainingUses, setRemainingUses] = useState<number | null>(null);
 
   // API key state — loaded from saved keys
   const [savedKeys, setSavedKeys] = useState<SavedKey[]>([]);
@@ -295,6 +296,17 @@ export default function DigitalFootprint() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+
+      // Handle rate limiting before attempting to parse body
+      if (res.status === 429) {
+        setRemainingUses(0);
+        setScrapeError("Daily import limit reached. You can import up to 5 times per day. Resets at midnight.");
+        return;
+      }
+
+      // Read rate limit header from any successful response
+      const remaining = res.headers.get("X-RateLimit-Remaining");
+      if (remaining !== null) setRemainingUses(parseInt(remaining, 10));
 
       const data = (await res.json()) as { status?: string; profile?: ExtractedProfileData; error?: string };
 
@@ -421,32 +433,43 @@ export default function DigitalFootprint() {
         )}
 
         {/* Import button */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleScrape}
-            disabled={scraping || !scrapeInput.trim() || (needsKey && keysLoaded && !hasKey)}
-            className="flex items-center gap-2 bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 hover:text-oracle-300 font-medium text-sm px-5 py-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {scraping ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <currentMode.icon className="w-4 h-4" />
-            )}
-            {scraping ? "Importing…" : "Import"}
-          </button>
-
-          {scrapeResult && (
+        <div>
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => {
-                setScrapeResult(null);
-                setScrapeInput("");
-                setApplied(false);
-              }}
-              className="flex items-center gap-1.5 text-xs text-text-ghost hover:text-text-secondary transition-colors"
+              onClick={handleScrape}
+              disabled={scraping || !scrapeInput.trim() || (needsKey && keysLoaded && !hasKey) || remainingUses === 0}
+              className="flex items-center gap-2 bg-oracle-500/10 hover:bg-oracle-500/20 border border-oracle-800/40 hover:border-oracle-700/60 text-oracle-400 hover:text-oracle-300 font-medium text-sm px-5 py-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Reset
+              {scraping ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <currentMode.icon className="w-4 h-4" />
+              )}
+              {scraping ? "Importing…" : "Import"}
             </button>
+
+            {scrapeResult && (
+              <button
+                onClick={() => {
+                  setScrapeResult(null);
+                  setScrapeInput("");
+                  setApplied(false);
+                }}
+                className="flex items-center gap-1.5 text-xs text-text-ghost hover:text-text-secondary transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Reset
+              </button>
+            )}
+          </div>
+
+          {remainingUses !== null && remainingUses > 0 && (
+            <p className="text-xs text-text-ghost mt-2">
+              {remainingUses} of 5 imports remaining today
+            </p>
+          )}
+          {remainingUses === 0 && (
+            <p className="text-xs text-hazard-400 mt-1">Daily limit reached. Resets at midnight.</p>
           )}
         </div>
       </div>
