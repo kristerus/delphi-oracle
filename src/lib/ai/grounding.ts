@@ -8,9 +8,12 @@
  */
 
 import type { UserProfile, SimulationCategory } from "./types";
+import { perplexityResearch, formatPerplexityContext } from "./perplexity";
 
 export interface GroundingContext {
   searchResults: string;
+  citations?: string[];
+  source: "perplexity" | "openai" | "none";
   timestamp: string;
 }
 
@@ -112,7 +115,11 @@ async function searchWithOpenAI(
 
 /**
  * Gather real-world grounding context for a simulation.
- * Returns a structured string that can be injected into prompts.
+ *
+ * Priority: Perplexity Sonar (if PERPLEXITY_API_KEY set) → OpenAI web search → none
+ *
+ * Perplexity is preferred because it does a single deep research query with
+ * citations, vs OpenAI web search which requires multiple shallow queries.
  */
 export async function gatherGroundingContext(
   decision: string,
@@ -121,33 +128,46 @@ export async function gatherGroundingContext(
   apiKey: string,
   provider: string
 ): Promise<GroundingContext> {
-  // Only use web search with OpenAI (it's an OpenAI-specific API)
-  if (provider !== "openai" || !apiKey) {
-    return {
-      searchResults: "",
-      timestamp: new Date().toISOString(),
-    };
+  const timestamp = new Date().toISOString();
+
+  // 1. Try Perplexity first (works regardless of user's AI provider choice)
+  if (process.env.PERPLEXITY_API_KEY) {
+    try {
+      const research = await perplexityResearch(decision, profile, categories);
+      if (research?.content) {
+        return {
+          searchResults: research.content.slice(0, 5000),
+          citations: research.citations,
+          source: "perplexity",
+          timestamp,
+        };
+      }
+    } catch {
+      // Fall through to OpenAI
+    }
   }
 
-  const queries = buildSearchQueries(decision, profile, categories);
-
-  try {
-    const results = await Promise.all(
-      queries.map((q) => searchWithOpenAI(q, apiKey).catch(() => ""))
-    );
-
-    const combined = results.filter(Boolean).join("\n\n---\n\n");
-
-    return {
-      searchResults: combined.slice(0, 4000), // Cap context to avoid token bloat
-      timestamp: new Date().toISOString(),
-    };
-  } catch {
-    return {
-      searchResults: "",
-      timestamp: new Date().toISOString(),
-    };
+  // 2. Fallback: OpenAI web search (only works if provider is openai)
+  if (provider === "openai" && apiKey) {
+    const queries = buildSearchQueries(decision, profile, categories);
+    try {
+      const results = await Promise.all(
+        queries.map((q) => searchWithOpenAI(q, apiKey).catch(() => ""))
+      );
+      const combined = results.filter(Boolean).join("\n\n---\n\n");
+      if (combined) {
+        return {
+          searchResults: combined.slice(0, 4000),
+          source: "openai",
+          timestamp,
+        };
+      }
+    } catch {
+      // Fall through
+    }
   }
+
+  return { searchResults: "", source: "none", timestamp };
 }
 
 /**
@@ -155,6 +175,19 @@ export async function gatherGroundingContext(
  */
 export function formatGroundingForPrompt(ctx: GroundingContext): string {
   if (!ctx.searchResults) return "";
+
+  if (ctx.source === "perplexity") {
+    const citationBlock =
+      ctx.citations?.length
+        ? `\n\nSOURCES:\n${ctx.citations.map((c, i) => `[${i + 1}] ${c}`).join("\n")}`
+        : "";
+
+    return `
+DEEP RESEARCH CONTEXT (live web search with citations, ${ctx.timestamp}):
+${ctx.searchResults}${citationBlock}
+
+Use the above research to ground EVERY prediction in specific, verifiable reality. Reference the actual companies, people, programs, salary ranges, and market conditions found above.`;
+  }
 
   return `
 REAL-WORLD CONTEXT (from live web search, ${ctx.timestamp}):
