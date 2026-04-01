@@ -6,6 +6,7 @@ import { callAI, parseAIJson } from "@/lib/ai/client";
 import { logger } from "@/lib/logger";
 import type { ExtractedProfileData } from "@/lib/scraper/types";
 import type { AIProvider } from "@/lib/ai/types";
+import { enrichLinkedInProfile } from "@/lib/scraper/proxycurl";
 
 /* ─── GitHub scrape (no API key needed) ─────────────────────────────────────── */
 
@@ -183,14 +184,37 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "apiKey is required for text parsing" }, { status: 400 });
       const provider = (body.provider ?? "claude") as AIProvider;
       profile = await parseWithAI(body.content, body.apiKey, provider);
+    } else if (body.type === "linkedin") {
+      if (!body.url?.trim())
+        return NextResponse.json({ error: "LinkedIn URL is required" }, { status: 400 });
+      const enriched = await enrichLinkedInProfile(body.url.trim());
+      if (!enriched) {
+        return NextResponse.json(
+          { error: "LinkedIn enrichment unavailable. Configure PROXYCURL_API_KEY or use the URL scraper instead." },
+          { status: 400 }
+        );
+      }
+      profile = enriched;
     } else if (body.type === "url") {
       if (!body.url?.trim())
         return NextResponse.json({ error: "url is required" }, { status: 400 });
       if (!body.apiKey)
         return NextResponse.json({ error: "apiKey is required for URL parsing" }, { status: 400 });
       const provider = (body.provider ?? "claude") as AIProvider;
-      const text = await fetchAndExtractText(body.url.trim());
-      profile = await parseWithAI(text, body.apiKey, provider);
+      // Auto-detect LinkedIn URLs and use Proxycurl if available
+      if (body.url.includes("linkedin.com/in/")) {
+        const enriched = await enrichLinkedInProfile(body.url.trim());
+        if (enriched) {
+          profile = enriched;
+          logger.info("Used Proxycurl for LinkedIn URL", { userId: session.user.id });
+        } else {
+          const text = await fetchAndExtractText(body.url.trim());
+          profile = await parseWithAI(text, body.apiKey, provider);
+        }
+      } else {
+        const text = await fetchAndExtractText(body.url.trim());
+        profile = await parseWithAI(text, body.apiKey, provider);
+      }
     } else {
       return NextResponse.json(
         { error: "type must be github, text, or url" },

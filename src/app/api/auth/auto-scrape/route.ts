@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import type { ExtractedProfileData } from "@/lib/scraper/types";
 import type { EducationEntry, ExperienceEntry } from "@/lib/db/schema";
+import { enrichLinkedInProfile, findLinkedInByEmail } from "@/lib/scraper/proxycurl";
 
 /* ─── GitHub scrape (using OAuth token for higher rate limits) ────────────── */
 
@@ -130,35 +131,54 @@ async function scrapeGitHubAuth(
   };
 }
 
-/* ─── LinkedIn profile from OAuth token ───────────────────────────────────── */
+/* ─── LinkedIn profile from OAuth token + Proxycurl enrichment ────────────── */
 
 async function scrapeLinkedInAuth(
-  accessToken: string
+  accessToken: string,
+  userEmail?: string
 ): Promise<Partial<ExtractedProfileData>> {
-  // LinkedIn's OpenID Connect userinfo endpoint
+  // Step 1: Get basic info from LinkedIn's OpenID Connect
   const res = await fetch("https://api.linkedin.com/v2/userinfo", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if (!res.ok) {
-    logger.warn("LinkedIn userinfo failed", { status: res.status });
-    return {};
+  let basicName: string | undefined;
+  let basicEmail: string | undefined;
+
+  if (res.ok) {
+    const data = (await res.json()) as {
+      sub: string;
+      name?: string;
+      given_name?: string;
+      family_name?: string;
+      email?: string;
+    };
+    basicName = data.name ?? ([data.given_name, data.family_name].filter(Boolean).join(" ") || undefined);
+    basicEmail = data.email;
   }
 
-  const data = (await res.json()) as {
-    sub: string;
-    name?: string;
-    given_name?: string;
-    family_name?: string;
-    picture?: string;
-    email?: string;
-    email_verified?: boolean;
-    locale?: { country: string; language: string };
-  };
+  // Step 2: Try Proxycurl enrichment for full work history + skills
+  const email = basicEmail ?? userEmail;
+  if (email && process.env.PROXYCURL_API_KEY) {
+    try {
+      // Find LinkedIn URL from email, then enrich
+      const linkedinUrl = await findLinkedInByEmail(email);
+      if (linkedinUrl) {
+        const enriched = await enrichLinkedInProfile(linkedinUrl);
+        if (enriched) {
+          logger.info("Proxycurl LinkedIn enrichment succeeded", { email });
+          return enriched;
+        }
+      }
+    } catch (err) {
+      logger.warn("Proxycurl enrichment failed", { error: String(err) });
+    }
+  }
 
+  // Fallback: basic OAuth data only
   return {
-    name: data.name ?? ([data.given_name, data.family_name].filter(Boolean).join(" ") || undefined),
-    socialHandles: { linkedin: data.sub },
+    name: basicName,
+    socialHandles: {},
   };
 }
 
@@ -288,7 +308,7 @@ export async function POST() {
             acct.accessToken!
           );
         } else if (acct.providerId === "linkedin") {
-          const linkedinData = await scrapeLinkedInAuth(acct.accessToken!);
+          const linkedinData = await scrapeLinkedInAuth(acct.accessToken!, session.user.email);
           scrapedData = {
             ...scrapedData,
             ...linkedinData,
