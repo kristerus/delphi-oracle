@@ -22,6 +22,7 @@ import {
   Linkedin,
   Github,
   Quote,
+  Menu,
 } from "lucide-react";
 
 /* ─── Constellation Canvas ──────────────────────────────────────────────────── */
@@ -378,6 +379,7 @@ export default function LandingPage() {
   const { scrollY } = useScroll();
   const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
   const heroScale = useTransform(scrollY, [0, 400], [1, 0.96]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-void-950 overflow-x-hidden">
@@ -402,7 +404,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150 px-4 py-2"
+              className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150 px-4 py-2 hidden sm:block"
             >
               Sign in
             </Link>
@@ -412,8 +414,60 @@ export default function LandingPage() {
             >
               Get started <ArrowRight className="w-3.5 h-3.5" />
             </Link>
+            <button
+              className="md:hidden p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-void-800/60 transition-colors"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </nav>
+
+        {/* Mobile nav menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden md:hidden bg-void-900/95 backdrop-blur-xl border-t border-border-subtle"
+            >
+              <div className="px-6 py-4 space-y-1">
+                {[
+                  { href: "#features", label: "Features" },
+                  { href: "#how-it-works", label: "How it works" },
+                  { href: "#pricing", label: "Pricing" },
+                ].map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2.5 rounded-xl text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-void-800/60 transition-all"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+                <div className="h-px bg-border-subtle my-2" />
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3 py-2.5 rounded-xl text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-void-800/60 transition-all"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/register"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3 py-2.5 rounded-xl text-sm font-medium text-oracle-400 hover:text-oracle-300 hover:bg-oracle-900/30 transition-all"
+                >
+                  Get started free
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* ── Hero ── */}
