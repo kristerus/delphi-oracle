@@ -517,6 +517,41 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
   const [extendError, setExtendError] = useState<string | null>(null);
   const [certaintyThreshold, setCertaintyThreshold] = useState(0);
 
+  // ── User profile (for grounded extend calls) ──
+  const [userProfile, setUserProfile] = useState<{
+    name: string; bio?: string; location?: string;
+    skills: string[]; experience: Array<{ company: string; title: string; years?: number }>;
+    education: Array<{ institution: string; degree?: string }>;
+    riskTolerance?: string; timeHorizon?: string;
+  }>({ name: "", skills: [], experience: [], education: [] });
+
+  useEffect(() => {
+    if (isGuest || isDemo) return;
+    fetch("/api/profile")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
+          setUserProfile({
+            name: session?.user?.name ?? data.name ?? "",
+            bio: data.bio ?? undefined,
+            location: data.location ?? undefined,
+            skills: data.skills ?? [],
+            experience: (data.experience ?? []).map((e: { company: string; title: string }) => ({
+              company: e.company, title: e.title,
+            })),
+            education: (data.education ?? []).map((e: { institution: string; degree?: string }) => ({
+              institution: e.institution, degree: e.degree,
+            })),
+            riskTolerance: data.preferences?.riskTolerance,
+            timeHorizon: data.preferences?.timeHorizon,
+          });
+        } else if (session?.user?.name) {
+          setUserProfile((p) => ({ ...p, name: session.user.name ?? "" }));
+        }
+      })
+      .catch(() => {});
+  }, [isGuest, isDemo, session]);
+
   // ── API key (session-scoped) ──
   const [apiKey, setApiKey] = useState(() =>
     typeof window !== "undefined" ? sessionStorage.getItem(SESSION_KEY_KEY) ?? "" : ""
@@ -582,13 +617,11 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
       setExtendError(null);
 
       try {
-        const profile = { name: "", skills: [], experience: [], education: [] };
-
         const endpoint = depth > 1 ? "/api/oracle/deep-extend" : "/api/oracle/extend";
         const body =
           depth > 1
-            ? { nodeId, simulationId: id, profile, provider, apiKey, depth, granularity }
-            : { nodeId, simulationId: id, profile, provider, apiKey };
+            ? { nodeId, simulationId: id, profile: userProfile, provider, apiKey, depth, granularity }
+            : { nodeId, simulationId: id, profile: userProfile, provider, apiKey };
 
         const res = await fetch(endpoint, {
           method: "POST",
@@ -615,7 +648,7 @@ export default function SimulationPage({ params }: { params: Promise<{ id: strin
         });
       }
     },
-    [id, isDemo, apiKey, provider]
+    [id, isDemo, apiKey, provider, userProfile]
   );
 
   const handleExtendAll = useCallback(
